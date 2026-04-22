@@ -1,0 +1,68 @@
+---
+title: "adf-kit: ADF 1.0 parsing and generation for TypeScript"
+description: "adf-kit is a zero-dependency TypeScript library for parsing, validating, generating, and serializing Auto-lead Data Format (ADF) 1.0 XML."
+---
+
+adf-kit gives TypeScript applications a complete toolkit for working with Auto-lead Data Format (ADF) 1.0 — the XML standard that automotive CRMs, dealer management systems, and lead aggregators use to exchange vehicle purchase inquiries. Whether you are building a lead router that ingests inbound XML from third-party providers, or a form submission handler that needs to emit spec-compliant ADF to a dealer's CRM endpoint, adf-kit covers the full document lifecycle: parse raw XML into typed objects, validate those objects against the ADF 1.0 spec, build new leads with a fluent API, and serialize them back to XML.
+
+## What is ADF?
+
+Auto-lead Data Format (ADF) 1.0 is an XML specification maintained by the automotive industry for transmitting consumer vehicle-purchase leads between lead sources (websites, aggregators) and receiving dealers or CRMs. A single ADF document can carry one or more "prospects" — each describing a customer, the vehicles they are interested in, the receiving dealer (vendor), and the originating lead source (provider). The full specification is available at [adfxml.info](https://adfxml.info/adf_spec.pdf).
+
+## What adf-kit solves
+
+Implementing ADF from scratch requires reading a dense XML specification, hand-rolling an XML parser and serializer, and writing validation logic that distinguishes spec violations from non-fatal warnings. adf-kit eliminates that work. It ships a fluent builder that lets you construct valid ADF leads without ever reading the spec, a parser that turns inbound XML into fully-typed TypeScript objects, a non-throwing validator that categorizes issues as errors or warnings, and a serializer for round-tripping modified documents back to XML — all with zero runtime dependencies.
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Parse" icon="file-import">
+    Turn any ADF 1.0 XML string into a fully-typed `ADFDocument` with a single `ADFparse()` call. Access vehicle, customer, vendor, and provider data as structured TypeScript objects.
+  </Card>
+  <Card title="Validate" icon="circle-check">
+    `ADFvalidate()` never throws. It returns a `ValidationResult` with separate `errors` (spec violations) and `warnings` (non-fatal issues) arrays so you can decide how to handle each.
+  </Card>
+  <Card title="Generate" icon="wand-magic-sparkles">
+    Build spec-compliant ADF leads with `ADFProspectBuilder` — a fluent, type-safe API. Chain `.vehicle()`, `.customer()`, `.vendor()`, and `.provider()` calls, then call `.string()` or `.xml()` to get output.
+  </Card>
+  <Card title="Serialize" icon="file-export">
+    `ADFserialize()` converts any `ADFDocument` back to ADF XML. Use it to forward parsed leads, stamp resend status, or modify fields before re-transmitting.
+  </Card>
+</CardGroup>
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Add adf-kit to your project and configure your TypeScript environment.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first lead, parse inbound XML, and validate a document in minutes.
+  </Card>
+  <Card title="Generating leads" icon="pen-to-square" href="/guides/generating-leads">
+    In-depth guide to the `ADFProspectBuilder` and `ADFBuilder` APIs with real-world examples.
+  </Card>
+  <Card title="Parsing leads" icon="magnifying-glass" href="/guides/parsing-leads">
+    Parse, inspect, and round-trip inbound ADF documents from any lead provider.
+  </Card>
+</CardGroup>
+
+## Public API
+
+| Export | Kind | Description |
+|---|---|---|
+| `ADFparse(xml)` | Function | Parse an ADF XML string into a typed `ADFDocument`. Throws `ADFParseError` on malformed XML or missing required elements. |
+| `ADFvalidate(doc)` | Function | Validate a document against the ADF 1.0 spec. Never throws — returns `{ valid, errors, warnings }`. |
+| `ADFserialize(doc)` | Function | Serialize a typed `ADFDocument` back to an ADF XML string. |
+| `ADFProspectBuilder` | Class | Fluent builder for a single lead. Call `.string()` or `.xml()` to get output. |
+| `ADFBuilder` | Class | Fluent builder for a multi-prospect ADF document. |
+| `generateProspect(input)` | Function | One-shot: convert a `ProspectInput` object directly to an XML string. |
+| `generateADF(input)` | Function | One-shot: convert an `ADFInput` object directly to an XML string. |
+| `buildProspect(input)` | Function | Convert `ProspectInput` → `ADFProspect` without serializing. |
+| `buildDocument(input)` | Function | Convert `ADFInput` → `ADFDocument` without serializing. |
+
+All TypeScript entity types (`ADFDocument`, `ADFProspect`, `ADFVehicle`, `ADFCustomer`, `ADFVendor`, `ADFProvider`, `ADFContact`, and more) are also exported and available for use in your own code.
+
+<Note>
+  adf-kit has **zero runtime dependencies**. The libraries used during development (`fast-xml-parser`, `currency-codes-ts`, `i18n-iso-countries`) are bundled at build time and are not installed into your `node_modules` when you add `@uhteddy/adf-kit` to a project.
+</Note>

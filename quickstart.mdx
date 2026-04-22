@@ -1,80 +1,134 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Get started with adf-kit in 4 steps"
+description: "Install adf-kit, generate your first ADF lead with ADFProspectBuilder, parse inbound ADF XML with ADFparse, and validate a document with ADFvalidate."
 ---
 
-## Get started in three steps
+This page covers the four essential operations in adf-kit: installing the package, building a spec-compliant ADF lead from scratch, parsing inbound ADF XML into typed TypeScript objects, and validating a parsed document against the ADF 1.0 specification. Each step is self-contained — skip ahead to whichever operation is most relevant to your use case.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Install adf-kit">
+    Add `@uhteddy/adf-kit` to your project using your preferred package manager. TypeScript 5+ and an ESM module configuration are required.
 
-### Step 1: Set up your local environment
+    ```bash
+    npm install @uhteddy/adf-kit
+    ```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    Verify the install by importing the main builder:
 
-### Step 2: Deploy your changes
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+    console.log(typeof ADFProspectBuilder); // "function"
+    ```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    For full setup instructions including `tsconfig.json` requirements, see [Installing adf-kit](/installation).
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Generate your first lead">
+    Use `ADFProspectBuilder` to construct a new car purchase lead. Chain `.vehicle()`, `.customer()`, `.vendor()`, and optionally `.provider()`, then call `.string()` to get the ADF XML.
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
 
-### Step 3: Go live
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2025,
+        make: 'Toyota',
+        model: 'Camry',
+        trim: 'XSE',
+        interest: 'buy',
+        status: 'new',
+        price: 32_500,
+        colors: [{ exterior: 'Midnight Black', interior: 'Black' }],
+      })
+      .customer({
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane.smith@example.com',
+        phone: '555-867-5309',
+        address: { city: 'Austin', regionCode: 'TX', postalCode: '78701' },
+        timeFrame: { description: 'Within 30 days', earliest: '2025-05-01', latest: '2025-05-31' },
+      })
+      .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com', phone: '512-555-0100' })
+      .provider({ name: 'AutoTrader', service: 'New Car Search', url: 'https://autotrader.com' })
+      .string();
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    `xml` is now a complete ADF 1.0 XML string ready to POST to a dealer CRM endpoint or save to a file. To get a `Blob` with `Content-Type: application/xml` instead — useful as a `fetch` body or email attachment — call `.xml()` in place of `.string()`.
+  </Step>
+
+  <Step title="Parse inbound ADF XML">
+    Use `ADFparse` to convert an ADF XML string received from a lead provider into a typed `ADFDocument`. Access vehicle, customer, and vendor data as structured TypeScript properties.
+
+    ```typescript
+    import { ADFparse } from '@uhteddy/adf-kit';
+
+    const doc = ADFparse(xmlString);
+    // doc.prospects[0].vehicles[0].make  → "Toyota"
+    // doc.prospects[0].customer.contact.emails[0].value  → "jane@example.com"
+    ```
+
+    To iterate over all leads in a document:
+
+    ```typescript
+    import { ADFparse } from '@uhteddy/adf-kit';
+
+    const doc = ADFparse(xmlString);
+
+    for (const prospect of doc.prospects) {
+      const { customer, vendor, vehicles, requestDate, status } = prospect;
+
+      const name = customer.contact.names.find(n => n.part === 'first')?.value;
+      const email = customer.contact.emails[0]?.value;
+      const phone = customer.contact.phones[0]?.value;
+
+      for (const vehicle of vehicles) {
+        console.log(`${requestDate} | ${status} | ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
+        console.log(`  Customer: ${name} <${email}> ${phone}`);
+        console.log(`  Dealer:   ${vendor.vendorName}`);
+      }
+    }
+    ```
+
+    `ADFparse` throws an `ADFParseError` if the XML is malformed or missing required elements. Wrap the call in a `try/catch` in production code.
+  </Step>
+
+  <Step title="Validate a document">
+    Use `ADFvalidate` to check a parsed document against the ADF 1.0 specification. It never throws — it always returns a `ValidationResult` with `valid`, `errors`, and `warnings` fields.
+
+    ```typescript
+    import { ADFparse, ADFvalidate } from '@uhteddy/adf-kit';
+
+    const doc = ADFparse(xmlString);
+    const result = ADFvalidate(doc);
+
+    if (!result.valid) {
+      for (const issue of result.errors) {
+        console.error(`[${issue.path}] ${issue.message}`);
+      }
+    }
+
+    for (const warn of result.warnings) {
+      console.warn(`[${warn.path}] ${warn.message}`);
+    }
+    ```
+
+    `errors` are spec violations — missing required fields, invalid contact information, or out-of-range values — that indicate the document does not conform to ADF 1.0. `warnings` flag non-fatal issues such as malformed VINs, suspect vehicle years, or invalid currency codes that may cause downstream problems without strictly violating the spec.
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Generating leads" icon="pen-to-square" href="/guides/generating-leads">
+    Explore all lead types: used car purchases, lease leads, trade-in appraisals, test drive requests, and multi-vehicle prospects.
+  </Card>
+  <Card title="Parsing leads" icon="magnifying-glass" href="/guides/parsing-leads">
+    Learn how to handle parse errors, extract nested data, and round-trip documents back to XML after modifying them.
+  </Card>
+  <Card title="Validation reference" icon="circle-check" href="/guides/validation">
+    Full list of validation errors and warnings, and patterns for integrating validation into a lead ingestion pipeline.
+  </Card>
+  <Card title="ADFProspectBuilder API" icon="book" href="/api/adf-prospect-builder">
+    Complete method reference for the fluent builder, including all input types and their optional fields.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

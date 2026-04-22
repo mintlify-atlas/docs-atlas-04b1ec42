@@ -1,0 +1,162 @@
+---
+title: "ADFContact, ADFName, ADFAddress types"
+description: "Reference for the contact, name, email, phone, address, and street types used throughout adf-kit to represent people and locations in ADF leads."
+---
+
+Contact information is shared by customers, vendors, and providers in every ADF lead processed by adf-kit. This page documents `ADFContact`, `ADFName`, `ADFEmail`, `ADFPhone`, `ADFAddress`, and `ADFStreet` — the complete set of interfaces used to represent people and their contact details.
+
+---
+
+## ADFContact
+
+The primary contact block, attached to customers, vendors, and optionally to providers. A contact must have at least one name, and at least one email address or phone number.
+
+<ResponseField name="names" type="ADFName[]" required>
+  One or more name segments for this contact. At least one entry is required.
+
+  <Expandable title="properties">
+    See [ADFName](#adfname) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="emails" type="ADFEmail[]" required>
+  Email addresses for this contact. At least one email or one phone is required by the ADF spec.
+
+  <Expandable title="properties">
+    See [ADFEmail](#adfemail) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="phones" type="ADFPhone[]" required>
+  Phone numbers for this contact. At least one email or one phone is required by the ADF spec.
+
+  <Expandable title="properties">
+    See [ADFPhone](#adfphone) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="address" type="ADFAddress">
+  Optional mailing or physical address for this contact.
+
+  <Expandable title="properties">
+    See [ADFAddress](#adfaddress) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="primaryContact" type="boolean" required>
+  `true` when this is the primary contact among multiple contacts on the same entity.
+</ResponseField>
+
+<Note>
+  The ADF 1.0 specification requires that every contact have at least one email address **or** one phone number. A contact with neither will produce a validation error when passed through `ADFvalidate`.
+</Note>
+
+---
+
+## ADFName
+
+A single name segment. Multiple `ADFName` entries on a contact allow representing first name, last name, and other parts separately.
+
+<ResponseField name="value" type="string" required>
+  The name text, e.g. `"Jane"` or `"Smith"`.
+</ResponseField>
+
+<ResponseField name="part" type="NamePart" required>
+  Which part of the name this segment represents. One of `"surname"`, `"first"`, `"middle"`, `"last"`, or `"full"`. See [NamePart](/api/types-enums#namepart).
+</ResponseField>
+
+<ResponseField name="type" type="NameType" required>
+  Whether this name belongs to a `"business"` entity or an `"individual"`. See [NameType](/api/types-enums#nametype).
+</ResponseField>
+
+---
+
+## ADFEmail
+
+A single email address with a flag indicating whether it is the preferred contact method.
+
+<ResponseField name="value" type="string" required>
+  The email address string, e.g. `"jane.smith@example.com"`.
+</ResponseField>
+
+<ResponseField name="preferredContact" type="boolean" required>
+  `true` if the contact prefers to be reached at this email address.
+</ResponseField>
+
+---
+
+## ADFPhone
+
+A single phone number with type and preferred-time metadata.
+
+<ResponseField name="value" type="string" required>
+  The phone number string, e.g. `"555-867-5309"`.
+</ResponseField>
+
+<ResponseField name="type" type="PhoneType" required>
+  The kind of phone line. One of `"voice"`, `"fax"`, `"cellphone"`, or `"pager"`. See [PhoneType](/api/types-enums#phonetype).
+</ResponseField>
+
+<ResponseField name="time" type="PhoneTime" required>
+  The best time of day to call. One of `"morning"`, `"afternoon"`, `"evening"`, `"nopreference"`, or `"day"`. See [PhoneTime](/api/types-enums#phonetime).
+</ResponseField>
+
+<ResponseField name="preferredContact" type="boolean" required>
+  `true` if the contact prefers to be reached at this phone number.
+</ResponseField>
+
+---
+
+## ADFAddress
+
+A mailing or physical address. Streets are stored as an ordered array of `ADFStreet` entries.
+
+<ResponseField name="streets" type="ADFStreet[]" required>
+  Street lines for this address. The ADF spec allows up to 5 street lines.
+
+  <Expandable title="properties">
+    See [ADFStreet](#adfstreet) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="apartment" type="string">
+  Apartment, suite, or unit number.
+</ResponseField>
+
+<ResponseField name="city" type="string">
+  City name.
+</ResponseField>
+
+<ResponseField name="regionCode" type="string">
+  State or province code. For North American addresses, the two-character code is recommended (e.g. `"TX"`, `"CA"`, `"ON"`).
+</ResponseField>
+
+<ResponseField name="postalCode" type="string">
+  ZIP or postal code.
+</ResponseField>
+
+<ResponseField name="country" type="Alpha2Code">
+  ISO 3166-1 alpha-2 country code, e.g. `"US"`, `"CA"`, `"GB"`. The type is imported from `i18n-iso-countries` and enforces valid codes at compile time.
+</ResponseField>
+
+<ResponseField name="type" type="AddressType">
+  The purpose of this address: `"work"`, `"home"`, or `"delivery"`. See [AddressType](/api/types-enums#addresstype).
+</ResponseField>
+
+<Note>
+  An address may contain at most 5 street lines. When using the builder API, pass a string array to `AddressInput.street` — each element becomes a separate `ADFStreet` with an automatically assigned line number from `"1"` to `"5"`.
+</Note>
+
+---
+
+## ADFStreet
+
+One line of a street address. Multiple entries on an `ADFAddress` allow multi-line street descriptions.
+
+<ResponseField name="value" type="string" required>
+  The street address text for this line, e.g. `"123 Main Street"`.
+</ResponseField>
+
+<ResponseField name="line" type="string">
+  The line number as a string, from `"1"` to `"5"`. Line numbers are used by some ADF recipients to determine how to reconstruct the full address.
+</ResponseField>

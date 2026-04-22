@@ -1,0 +1,581 @@
+---
+title: "ADFProspectBuilder — fluent lead builder"
+description: "Complete reference for ADFProspectBuilder: build a single ADF lead with a chainable TypeScript API, then export to XML string, Blob, or typed ADFProspect."
+---
+
+`ADFProspectBuilder` is the primary way to generate a single ADF 1.0 lead in adf-kit. It provides a fluent, chainable interface — you call `.vehicle()`, `.customer()`, and `.vendor()` in any order, then call a terminal method (`.string()`, `.xml()`, or `.build()`) to produce output. The TypeScript compiler enforces that all three required fields are set before the terminal methods become available, so missing data is caught at compile time rather than at runtime.
+
+## Constructor
+
+```typescript
+import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+const builder = new ADFProspectBuilder();
+```
+
+`ADFProspectBuilder` takes no arguments. All configuration is done through chained method calls.
+
+---
+
+## Methods
+
+### `.vehicle(input)`
+
+Adds a vehicle to the lead. You can call this method multiple times to express interest in more than one vehicle.
+
+```typescript
+builder.vehicle(input: VehicleInput): ADFProspectBuilder
+```
+
+<ParamField path="input" type="VehicleInput" required>
+  The vehicle the customer is interested in.
+
+  <Expandable title="VehicleInput properties">
+    <ParamField path="year" type="number" required>
+      Model year of the vehicle.
+    </ParamField>
+
+    <ParamField path="make" type="string" required>
+      Manufacturer name, e.g. `"Toyota"`, `"Ford"`.
+    </ParamField>
+
+    <ParamField path="model" type="string" required>
+      Model name, e.g. `"Camry"`, `"F-150"`.
+    </ParamField>
+
+    <ParamField path="vin" type="string">
+      17-character Vehicle Identification Number.
+    </ParamField>
+
+    <ParamField path="stock" type="string">
+      Dealer stock number.
+    </ParamField>
+
+    <ParamField path="trim" type="string">
+      Trim level, e.g. `"XSE"`, `"XLT"`, `"330i"`.
+    </ParamField>
+
+    <ParamField path="doors" type="number">
+      Number of doors.
+    </ParamField>
+
+    <ParamField path="bodyStyle" type="string">
+      Body style, e.g. `"SUV"`, `"Sedan"`, `"Coupe"`.
+    </ParamField>
+
+    <ParamField path="transmission" type="string">
+      `"A"` for automatic, `"M"` for manual.
+    </ParamField>
+
+    <ParamField path="interest" type="'buy' | 'lease' | 'sell' | 'trade-in' | 'test-drive'" default="'buy'">
+      What the customer wants to do with this vehicle.
+    </ParamField>
+
+    <ParamField path="status" type="'new' | 'used'" default="'new'">
+      Whether the vehicle is new or used inventory.
+    </ParamField>
+
+    <ParamField path="condition" type="'excellent' | 'good' | 'fair' | 'poor' | 'unknown'">
+      Physical condition of the vehicle. Typically used for trade-in and used-car leads.
+    </ParamField>
+
+    <ParamField path="price" type="number | PriceInput">
+      Asking or quoted price. Pass a plain number to use the default `"quote"` price type, or a `PriceInput` object for full control.
+
+      <Expandable title="PriceInput properties">
+        <ParamField path="value" type="number" required>
+          Numeric price amount.
+        </ParamField>
+        <ParamField path="type" type="PriceType">
+          Price type: `"quote"`, `"offer"`, `"msrp"`, `"invoice"`, `"call"`, `"appraisal"`, or `"asking"`. Defaults to `"quote"` when omitted.
+        </ParamField>
+        <ParamField path="currency" type="string">
+          ISO 4217 currency code, e.g. `"USD"`, `"CAD"`. Defaults to the document's currency when omitted.
+        </ParamField>
+        <ParamField path="source" type="string">
+          Where this price came from, e.g. `"Kelley Blue Book"`.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="mileage" type="number | OdometerInput">
+      Odometer reading. Pass a plain number for a bare mileage value, or an `OdometerInput` object to specify units and status.
+
+      <Expandable title="OdometerInput properties">
+        <ParamField path="value" type="number" required>
+          Numeric odometer reading.
+        </ParamField>
+        <ParamField path="units" type="'mi' | 'km'">
+          Odometer units. Defaults to miles when omitted.
+        </ParamField>
+        <ParamField path="status" type="OdometerStatus">
+          Odometer status, e.g. `"original"`, `"replaced"`, `"unknown"`.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="colors" type="ColorInput | ColorInput[]">
+      Preferred interior and exterior color combinations, in preference order.
+
+      <Expandable title="ColorInput properties">
+        <ParamField path="interior" type="string">
+          Interior color description, e.g. `"Black"`.
+        </ParamField>
+        <ParamField path="exterior" type="string">
+          Exterior color description, e.g. `"Midnight Black"`.
+        </ParamField>
+        <ParamField path="preference" type="number">
+          Preference ranking where `1` is most preferred. Auto-assigned in array order when omitted.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="options" type="(string | OptionInput)[]">
+      Desired vehicle options or packages. Pass a plain string for a simple option name, or an `OptionInput` object for structured detail.
+
+      <Expandable title="OptionInput properties">
+        <ParamField path="name" type="string" required>
+          Option name, e.g. `"Sunroof"`, `"Tow Package"`.
+        </ParamField>
+        <ParamField path="manufacturerCode" type="string">
+          Manufacturer's option code.
+        </ParamField>
+        <ParamField path="weighting" type="number">
+          Customer preference weight from `-100` (essential NOT to have) to `+100` (essential to have). `0` means no preference.
+        </ParamField>
+        <ParamField path="stock" type="string">
+          Stock number associated with this option.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="finance" type="FinanceInput">
+      Financing or lease preferences for this vehicle.
+
+      <Expandable title="FinanceInput properties">
+        <ParamField path="method" type="FinanceMethod">
+          Finance method: `"finance"`, `"lease"`, `"cash"`. Defaults to `"finance"`.
+        </ParamField>
+        <ParamField path="downPayment" type="number">
+          Down payment amount.
+        </ParamField>
+        <ParamField path="monthlyPayment" type="number">
+          Target monthly payment amount.
+        </ParamField>
+        <ParamField path="totalAmount" type="number">
+          Total finance amount.
+        </ParamField>
+        <ParamField path="currency" type="string">
+          ISO 4217 currency code applied to all amounts in this object.
+        </ParamField>
+        <ParamField path="residualBalance" type="number">
+          Remaining balance — for example, a lease residual or trade-in payoff amount.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="comments" type="string">
+      Free-text comments about the vehicle or the customer's preferences.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+### `.customer(input)`
+
+Sets the customer (buyer) for this lead. Each builder holds one customer; calling this method a second time overwrites the previous value.
+
+```typescript
+builder.customer(input: CustomerInput): ADFProspectBuilder
+```
+
+<ParamField path="input" type="CustomerInput" required>
+  Contact and preference details for the customer.
+
+  <Expandable title="CustomerInput properties">
+    <ParamField path="firstName" type="string">
+      Customer's first name.
+    </ParamField>
+
+    <ParamField path="lastName" type="string">
+      Customer's last name.
+    </ParamField>
+
+    <ParamField path="fullName" type="string">
+      Full name as a single string. Used only when `firstName` and `lastName` are both absent.
+    </ParamField>
+
+    <ParamField path="email" type="string | string[]">
+      Email address or array of email addresses. The first address in the array is marked as the preferred contact.
+    </ParamField>
+
+    <ParamField path="phone" type="string | PhoneInput | Array<string | PhoneInput>">
+      Phone number(s). Pass a plain string for a simple voice number, or a `PhoneInput` object for full control over type and time preferences.
+
+      <Expandable title="PhoneInput properties">
+        <ParamField path="number" type="string" required>
+          Phone number string.
+        </ParamField>
+        <ParamField path="type" type="PhoneType">
+          Phone type: `"voice"`, `"fax"`, `"cellphone"`, `"pager"`. Defaults to `"voice"`.
+        </ParamField>
+        <ParamField path="time" type="PhoneTime">
+          Preferred contact time: `"morning"`, `"afternoon"`, `"evening"`, `"nopreference"`. Defaults to `"nopreference"`.
+        </ParamField>
+        <ParamField path="preferred" type="boolean">
+          Whether this is the customer's preferred phone contact. Defaults to `false`.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="address" type="AddressInput">
+      Customer's mailing or home address.
+
+      <Expandable title="AddressInput properties">
+        <ParamField path="street" type="string | string[]" required>
+          Street address. Pass a string for a single line or an array for up to five lines.
+        </ParamField>
+        <ParamField path="apartment" type="string">
+          Apartment, suite, or unit number.
+        </ParamField>
+        <ParamField path="city" type="string">
+          City name.
+        </ParamField>
+        <ParamField path="regionCode" type="string">
+          State or province abbreviation, e.g. `"TX"`, `"CA"`, `"ON"`.
+        </ParamField>
+        <ParamField path="postalCode" type="string">
+          ZIP or postal code.
+        </ParamField>
+        <ParamField path="country" type="string">
+          ISO 3166-1 alpha-2 country code, e.g. `"US"`, `"CA"`.
+        </ParamField>
+        <ParamField path="type" type="AddressType">
+          Address type: `"home"`, `"work"`, or `"delivery"`.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="timeFrame" type="string | { description?: string; earliest?: string | Date; latest?: string | Date }">
+      Purchase timeframe. Pass a plain string for a description (e.g. `"Within 30 days"`), or an object for structured earliest and latest dates.
+    </ParamField>
+
+    <ParamField path="comments" type="string">
+      Free-text comments from or about the customer.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+### `.vendor(input)`
+
+Sets the vendor (dealership) this lead is routed to.
+
+```typescript
+builder.vendor(input: VendorInput): ADFProspectBuilder
+```
+
+<ParamField path="input" type="VendorInput" required>
+  Details of the receiving dealership or selling entity.
+
+  <Expandable title="VendorInput properties">
+    <ParamField path="name" type="string" required>
+      Dealership or selling entity name, e.g. `"Sunrise Toyota"`.
+    </ParamField>
+
+    <ParamField path="url" type="string">
+      Dealership website URL.
+    </ParamField>
+
+    <ParamField path="contactName" type="string">
+      Name of the primary contact person at the dealership. Falls back to the vendor `name` when omitted.
+    </ParamField>
+
+    <ParamField path="email" type="string">
+      Email address for receiving leads.
+    </ParamField>
+
+    <ParamField path="phone" type="string">
+      Phone number for the dealership.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+### `.provider(input)`
+
+Optionally identifies the lead source (e.g. a third-party listing site or CRM aggregator). This method does not affect the required-field tracking — you can call it at any point in the chain.
+
+```typescript
+builder.provider(input: ProviderInput): ADFProspectBuilder
+```
+
+<ParamField path="input" type="ProviderInput" required>
+  Details of the lead source or originating service.
+
+  <Expandable title="ProviderInput properties">
+    <ParamField path="name" type="string" required>
+      Name of the lead source or service, e.g. `"AutoTrader"`.
+    </ParamField>
+
+    <ParamField path="service" type="string">
+      The specific service that originated the lead, e.g. `"New Car Search"`.
+    </ParamField>
+
+    <ParamField path="url" type="string">
+      URL of the provider or the originating listing page.
+    </ParamField>
+
+    <ParamField path="email" type="string">
+      Provider's contact email address.
+    </ParamField>
+
+    <ParamField path="phone" type="string">
+      Provider's contact phone number.
+    </ParamField>
+
+    <ParamField path="contact" type="ContactInput">
+      Optional named contact at the provider organization.
+
+      <Expandable title="ContactInput properties">
+        <ParamField path="firstName" type="string">
+          Contact's first name.
+        </ParamField>
+        <ParamField path="lastName" type="string">
+          Contact's last name.
+        </ParamField>
+        <ParamField path="fullName" type="string">
+          Full name as a single string, used when first/last are not available.
+        </ParamField>
+        <ParamField path="email" type="string | string[]">
+          Contact email address(es).
+        </ParamField>
+        <ParamField path="phone" type="string | PhoneInput | Array<string | PhoneInput>">
+          Contact phone number(s).
+        </ParamField>
+        <ParamField path="address" type="AddressInput">
+          Contact's mailing address.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+---
+
+### `.requestDate(date)`
+
+Overrides the lead timestamp. When not called, the timestamp defaults to the current time at the moment `.build()`, `.string()`, or `.xml()` is invoked.
+
+```typescript
+builder.requestDate(date: Date | string): ADFProspectBuilder
+```
+
+<ParamField path="date" type="Date | string" required>
+  The lead request date and time. Accepts a JavaScript `Date` object or an ISO 8601 date/datetime string.
+</ParamField>
+
+---
+
+### `.status(s)`
+
+Marks the lead as a resend of a previously submitted lead. Defaults to `"new"` when not called.
+
+```typescript
+builder.status(s: 'new' | 'resend'): ADFProspectBuilder
+```
+
+<ParamField path="s" type="'new' | 'resend'" required>
+  Use `"resend"` when retransmitting a lead that was already sent. Use `"new"` (the default) for first-time submissions.
+</ParamField>
+
+---
+
+## Terminal methods
+
+<Note>
+  The terminal methods `.build()`, `.string()`, and `.xml()` are only available after `.vehicle()`, `.customer()`, and `.vendor()` have all been called. The TypeScript compiler enforces this — attempting to call a terminal method before setting all three required fields produces a compile-time type error.
+</Note>
+
+### `.build()`
+
+Returns the fully-typed `ADFProspect` object without serializing. Use this when you want to inspect or transform the data before converting it to XML, or when you are passing the object to another adf-kit function such as `ADFvalidate`.
+
+```typescript
+builder.build(): ADFProspect
+```
+
+### `.string()`
+
+Serializes the lead to an ADF 1.0 XML string. Use this when your HTTP client, email library, or file writer accepts a raw string body.
+
+```typescript
+builder.string(): string
+```
+
+### `.xml()`
+
+Serializes the lead to a `Blob` with `Content-Type: application/xml`. The Blob carries the MIME type automatically, so you can pass it directly to `fetch` or any library that accepts `BodyInit`, without setting headers manually.
+
+```typescript
+builder.xml(): Blob
+```
+
+---
+
+## Examples
+
+<Tip>
+  You can call `.vehicle()`, `.customer()`, and `.vendor()` in any order — all three return the same builder instance. Only the terminal methods require all three to be set.
+</Tip>
+
+### New car purchase lead
+
+```typescript new car purchase lead
+import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFProspectBuilder()
+  .vehicle({
+    year: 2025,
+    make: 'Toyota',
+    model: 'Camry',
+    trim: 'XSE',
+    interest: 'buy',
+    status: 'new',
+    price: 32_500,
+    colors: [{ exterior: 'Midnight Black', interior: 'Black' }],
+  })
+  .customer({
+    firstName: 'Jane',
+    lastName: 'Smith',
+    email: 'jane.smith@example.com',
+    phone: '555-867-5309',
+    address: { city: 'Austin', regionCode: 'TX', postalCode: '78701' },
+    timeFrame: { description: 'Within 30 days', earliest: '2025-05-01', latest: '2025-05-31' },
+  })
+  .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com', phone: '512-555-0100' })
+  .provider({ name: 'AutoTrader', service: 'New Car Search', url: 'https://autotrader.com' })
+  .string();
+```
+
+### Used car purchase lead
+
+```typescript used car purchase lead
+import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFProspectBuilder()
+  .vehicle({
+    year: 2021,
+    make: 'Ford',
+    model: 'F-150',
+    trim: 'XLT',
+    vin: '1FTFW1E80MFA00001',
+    stock: 'P22481',
+    interest: 'buy',
+    status: 'used',
+    mileage: { value: 41_200, units: 'mi', status: 'original' },
+    price: { value: 38_900, type: 'asking' },
+    condition: 'good',
+  })
+  .customer({
+    firstName: 'Carlos',
+    lastName: 'Rivera',
+    email: 'carlos@example.com',
+    phone: [
+      { number: '512-555-0191', type: 'cellphone', preferred: true },
+      { number: '512-555-0100', type: 'voice' },
+    ],
+  })
+  .vendor({ name: 'Capital City Ford', email: 'internet@capitalcityford.com' })
+  .string();
+```
+
+### Lease lead
+
+```typescript lease lead
+import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFProspectBuilder()
+  .vehicle({
+    year: 2025,
+    make: 'BMW',
+    model: '3 Series',
+    trim: '330i',
+    interest: 'lease',
+    status: 'new',
+    finance: {
+      method: 'lease',
+      monthlyPayment: 550,
+      downPayment: 3_000,
+    },
+  })
+  .customer({
+    firstName: 'Priya',
+    lastName: 'Patel',
+    email: 'priya@example.com',
+    timeFrame: 'Within 2 weeks',
+  })
+  .vendor({ name: 'Downtown BMW', email: 'leads@downtownbmw.com' })
+  .string();
+```
+
+---
+
+## Output method comparison
+
+<Tabs>
+  <Tab title=".string()">
+    Returns the ADF XML as a plain string. Use with HTTP clients or libraries that accept a string body, or when you want to write the XML to a file.
+
+    ```typescript
+    const xml: string = new ADFProspectBuilder()
+      .vehicle({ year: 2025, make: 'Toyota', model: 'Camry' })
+      .customer({ firstName: 'Jane', email: 'jane@example.com' })
+      .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+      .string();
+
+    // Use as a fetch body with a manual Content-Type header
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/xml' },
+      body: xml,
+    });
+    ```
+  </Tab>
+  <Tab title=".xml()">
+    Returns the ADF XML as a `Blob` with `Content-Type: application/xml` already set. Pass it directly to `fetch` or any `BodyInit`-compatible library — no need to set the MIME header yourself.
+
+    ```typescript
+    const blob: Blob = new ADFProspectBuilder()
+      .vehicle({ year: 2025, make: 'Toyota', model: 'Camry' })
+      .customer({ firstName: 'Jane', email: 'jane@example.com' })
+      .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+      .xml();
+
+    // Content-Type is carried by the Blob automatically
+    await fetch(endpoint, { method: 'POST', body: blob });
+    ```
+  </Tab>
+  <Tab title=".build()">
+    Returns the fully-typed `ADFProspect` object without serializing to XML. Useful when you need to inspect values, pass the object to `ADFvalidate`, or feed it into `ADFBuilder` alongside other prospects.
+
+    ```typescript
+    import { ADFProspectBuilder, ADFvalidate } from '@uhteddy/adf-kit';
+    import type { ADFProspect } from '@uhteddy/adf-kit';
+
+    const prospect: ADFProspect = new ADFProspectBuilder()
+      .vehicle({ year: 2025, make: 'Toyota', model: 'Camry' })
+      .customer({ firstName: 'Jane', email: 'jane@example.com' })
+      .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+      .build();
+
+    const result = ADFvalidate({ version: '1.0', prospects: [prospect] });
+    if (!result.valid) {
+      console.error(result.errors);
+    }
+    ```
+  </Tab>
+</Tabs>

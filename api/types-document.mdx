@@ -1,0 +1,208 @@
+---
+title: "ADFDocument, ADFProspect, ADFProvider types"
+description: "Reference for the top-level document, prospect, customer, vendor, and provider interfaces that form the root structure of every ADF lead in adf-kit."
+---
+
+The adf-kit library models every automotive lead as a tree of typed interfaces rooted at `ADFDocument`. This page covers the top-level structural types — `ADFDocument`, `ADFProspect`, `ADFCustomer`, `ADFVendor`, `ADFProvider`, `ADFTimeFrame`, and `ADFId` — that you work with when parsing or programmatically building ADF XML.
+
+---
+
+## ADFDocument
+
+The root object returned by `ADFparse` and accepted by `ADFserialize`. A document may contain one or more prospects.
+
+<ResponseField name="version" type="string" required>
+  ADF specification version string, e.g. `"1.0"`.
+</ResponseField>
+
+<ResponseField name="prospects" type="ADFProspect[]" required>
+  One or more automotive leads contained in this document.
+
+  <Expandable title="properties">
+    See [ADFProspect](#adfprospect) below.
+  </Expandable>
+</ResponseField>
+
+---
+
+## ADFProspect
+
+A single automotive lead — the primary record exchanged between lead sources and dealerships.
+
+<ResponseField name="ids" type="ADFId[]" required>
+  System identifiers for this prospect record.
+
+  <Expandable title="properties">
+    See [ADFId](#adfid) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="requestDate" type="ISO8601DateTime" required>
+  ISO 8601 date-time string recording when the lead was created.
+</ResponseField>
+
+<ResponseField name="vehicles" type="ADFVehicle[]" required>
+  At least one vehicle the customer is interested in. See [ADFVehicle](/api/types-vehicle).
+</ResponseField>
+
+<ResponseField name="customer" type="ADFCustomer" required>
+  The buyer or prospect. See [ADFCustomer](#adfcustomer) below.
+</ResponseField>
+
+<ResponseField name="vendor" type="ADFVendor" required>
+  The dealership or selling entity this lead is routed to. See [ADFVendor](#adfvendor) below.
+</ResponseField>
+
+<ResponseField name="provider" type="ADFProvider">
+  The lead source or third-party service that originated this lead (e.g. CarPoint, Autoweb). Optional.
+
+  <Expandable title="properties">
+    See [ADFProvider](#adfprovider) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="status" type="'new' | 'resend'" required>
+  Whether this is a first submission (`"new"`) or a resubmission of a previously sent lead (`"resend"`).
+</ResponseField>
+
+---
+
+## ADFCustomer
+
+The buyer or prospect submitting the lead.
+
+<ResponseField name="contact" type="ADFContact" required>
+  Contact information for the customer. See [ADFContact](/api/types-contact).
+</ResponseField>
+
+<ResponseField name="ids" type="ADFId[]" required>
+  System identifiers for the customer record.
+
+  <Expandable title="properties">
+    See [ADFId](#adfid) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="timeFrame" type="ADFTimeFrame">
+  The customer's intended purchase timeframe.
+
+  <Expandable title="properties">
+    <ResponseField name="description" type="string">
+      Free-text description of the timeframe, e.g. `"Within 3 months"`.
+    </ResponseField>
+    <ResponseField name="earliestDate" type="ISO8601Date">
+      The earliest date the customer intends to purchase (ISO 8601 date string).
+    </ResponseField>
+    <ResponseField name="latestDate" type="ISO8601Date">
+      The latest date the customer intends to purchase (ISO 8601 date string).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="comments" type="string">
+  Free-text comments from or about the customer.
+</ResponseField>
+
+---
+
+## ADFVendor
+
+The dealership or selling entity that should receive this lead.
+
+<ResponseField name="ids" type="ADFId[]" required>
+  System identifiers for the vendor.
+
+  <Expandable title="properties">
+    See [ADFId](#adfid) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="vendorName" type="string" required>
+  The display name of the dealership or vendor, e.g. `"Sunrise Toyota"`.
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The vendor's website URL.
+</ResponseField>
+
+<ResponseField name="contact" type="ADFContact" required>
+  Primary contact at the vendor. See [ADFContact](/api/types-contact).
+</ResponseField>
+
+---
+
+## ADFProvider
+
+The third-party lead source or aggregator that originated the lead — for example CarPoint, Autoweb, or Cobalt. This field is optional on a prospect.
+
+<ResponseField name="ids" type="ADFId[]" required>
+  System identifiers for the provider.
+
+  <Expandable title="properties">
+    See [ADFId](#adfid) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="name" type="ADFName" required>
+  Name of the lead source service. See [ADFName](/api/types-contact#adfname).
+</ResponseField>
+
+<ResponseField name="service" type="string">
+  The specific service or product within the provider that generated the lead, e.g. `"New Car Search"`.
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The provider's website URL.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  General reply-to address for lead-related issues at the provider.
+</ResponseField>
+
+<ResponseField name="phone" type="string">
+  Provider contact phone number.
+</ResponseField>
+
+<ResponseField name="contact" type="ADFContact">
+  An optional named contact at the provider. See [ADFContact](/api/types-contact).
+</ResponseField>
+
+---
+
+## ADFTimeFrame
+
+Represents the customer's intended purchase window. All fields are optional — include whichever combination makes sense for your data.
+
+<ResponseField name="description" type="string">
+  Human-readable timeframe description, e.g. `"Within 30 days"`.
+</ResponseField>
+
+<ResponseField name="earliestDate" type="ISO8601Date">
+  Earliest date the customer expects to purchase (ISO 8601 date string, e.g. `"2025-06-01"`).
+</ResponseField>
+
+<ResponseField name="latestDate" type="ISO8601Date">
+  Latest date the customer expects to purchase (ISO 8601 date string, e.g. `"2025-09-30"`).
+</ResponseField>
+
+---
+
+## ADFId
+
+Tracks the identity of an entity across multiple systems. A single prospect, vehicle, customer, or vendor may carry multiple `ADFId` entries — one per originating system.
+
+<ResponseField name="value" type="string" required>
+  The identifier value as assigned by the originating system.
+</ResponseField>
+
+<ResponseField name="sequence" type="number">
+  Ordinal that tracks how many times this datum has been passed between systems. Useful for deduplication and lineage tracking.
+</ResponseField>
+
+<ResponseField name="source" type="string">
+  Name of the system that created this identifier, e.g. `"CarPoint"` or `"DealerSocket"`.
+</ResponseField>
+
+<Note>
+  The ADF 1.0 specification requires the `source` attribute on every `<id>` element. Although the TypeScript type marks it as optional to accommodate partially-formed data, you should always populate `source` when constructing ADF documents intended for spec-compliant recipients.
+</Note>

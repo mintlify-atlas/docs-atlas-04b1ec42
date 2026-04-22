@@ -1,0 +1,260 @@
+---
+title: "Generating ADF leads with adf-kit"
+description: "Build ADF 1.0 lead documents for new and used car purchases, leases, trade-ins, test drives, and multi-vehicle prospects using adf-kit's fluent builders."
+---
+
+adf-kit gives you two ways to produce ADF 1.0 XML: the fluent `ADFProspectBuilder` and `ADFBuilder` classes, which guide you through setting required fields before letting you call `.string()` or `.xml()`, and the one-shot `generateProspect()` factory for cases where you already have all the data in a single object. This page walks through the most common lead types with real examples for each.
+
+## Fluent builders
+
+`ADFProspectBuilder` is the recommended approach for constructing a single lead. TypeScript enforces that you call `.vehicle()`, `.customer()`, and `.vendor()` before the terminal output methods become available — missing any of the three is a compile-time error, not a runtime surprise.
+
+<Note>
+  TypeScript's type system tracks which required methods have been called on the builder. Attempting to call `.string()` or `.xml()` before setting a vehicle, customer, and vendor produces a type error at compile time, so mistakes are caught before your code runs.
+</Note>
+
+<Tip>
+  Call `.provider()` on any builder to record the lead source — the ad network, listing site, or internal tool that generated the inquiry. The provider name and service are passed through to the ADF `<provider>` element and appear in most CRM dashboards.
+</Tip>
+
+## Lead types
+
+<Tabs>
+  <Tab title="New car purchase">
+    A new-car lead sets `status: 'new'` and `interest: 'buy'` on the vehicle. Supply a price, color preferences, and a customer timeframe to give the dealer everything they need to follow up.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2025,
+        make: 'Toyota',
+        model: 'Camry',
+        trim: 'XSE',
+        interest: 'buy',
+        status: 'new',
+        price: 32_500,
+        colors: [{ exterior: 'Midnight Black', interior: 'Black' }],
+      })
+      .customer({
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane.smith@example.com',
+        phone: '555-867-5309',
+        address: { city: 'Austin', regionCode: 'TX', postalCode: '78701' },
+        timeFrame: { description: 'Within 30 days', earliest: '2025-05-01', latest: '2025-05-31' },
+      })
+      .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com', phone: '512-555-0100' })
+      .provider({ name: 'AutoTrader', service: 'New Car Search', url: 'https://autotrader.com' })
+      .string();
+    ```
+
+    `.string()` returns the ADF XML as a plain string, suitable as an HTTP request body or for writing to a file. Use `.xml()` instead to get a `Blob` with `Content-Type: application/xml` already set — handy when passing directly to `fetch`.
+  </Tab>
+
+  <Tab title="Used car purchase">
+    For used inventory, add a VIN, stock number, and odometer reading. Setting `condition` helps the dealer's CRM triage the lead.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2021,
+        make: 'Ford',
+        model: 'F-150',
+        trim: 'XLT',
+        vin: '1FTFW1E80MFA00001',
+        stock: 'P22481',
+        interest: 'buy',
+        status: 'used',
+        mileage: { value: 41_200, units: 'mi', status: 'original' },
+        price: { value: 38_900, type: 'asking' },
+        condition: 'good',
+      })
+      .customer({
+        firstName: 'Carlos',
+        lastName: 'Rivera',
+        email: 'carlos@example.com',
+        phone: [
+          { number: '512-555-0191', type: 'cellphone', preferred: true },
+          { number: '512-555-0100', type: 'voice' },
+        ],
+      })
+      .vendor({ name: 'Capital City Ford', email: 'internet@capitalcityford.com' })
+      .string();
+    ```
+
+    The `phone` field on `CustomerInput` accepts a string, a `PhoneInput` object, or an array of either. When passing an array, mark the customer's preferred number with `preferred: true`.
+  </Tab>
+
+  <Tab title="Lease">
+    Lease leads use `interest: 'lease'` on the vehicle and carry financing details — method, monthly payment cap, and maximum down payment — inside the `finance` field.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2025,
+        make: 'BMW',
+        model: '3 Series',
+        trim: '330i',
+        interest: 'lease',
+        status: 'new',
+        finance: {
+          method: 'lease',
+          monthlyPayment: 550,
+          downPayment: 3_000,
+        },
+      })
+      .customer({
+        firstName: 'Priya',
+        lastName: 'Patel',
+        email: 'priya@example.com',
+        timeFrame: 'Within 2 weeks',
+      })
+      .vendor({ name: 'Downtown BMW', email: 'leads@downtownbmw.com' })
+      .string();
+    ```
+
+    `timeFrame` can be a plain string (treated as the description) or a structured object with optional `earliest` and `latest` date strings or `Date` objects.
+  </Tab>
+
+  <Tab title="Trade-in appraisal">
+    Trade-in leads set `interest: 'trade-in'`. Include the VIN, mileage, condition, and an appraisal price so the dealer has enough information to prepare an offer before contacting the customer.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2019,
+        make: 'Honda',
+        model: 'CR-V',
+        trim: 'EX',
+        vin: '2HKRW2H55KH600001',
+        interest: 'trade-in',
+        status: 'used',
+        mileage: 78_400,
+        condition: 'good',
+        price: { value: 22_000, type: 'appraisal' },
+      })
+      .customer({
+        firstName: 'Marcus',
+        lastName: 'Johnson',
+        email: 'marcus.j@example.com',
+        comments: 'Interested in trading this in toward a new SUV.',
+      })
+      .vendor({ name: 'Greenfield Honda', email: 'appraisals@greenfieldhonda.com' })
+      .string();
+    ```
+
+    Pass `mileage` as a bare number when you only have the value and no units or status metadata. The builder defaults to no units attribute, which is valid ADF.
+  </Tab>
+
+  <Tab title="Test drive">
+    Test drive requests set `interest: 'test-drive'`. A timeframe description telling the dealer when the customer is available helps schedule the appointment.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2024,
+        make: 'Rivian',
+        model: 'R1T',
+        interest: 'test-drive',
+        status: 'new',
+      })
+      .customer({
+        firstName: 'Alex',
+        lastName: 'Chen',
+        email: 'alex@example.com',
+        phone: '415-555-0177',
+        timeFrame: { description: 'This weekend if possible' },
+      })
+      .vendor({ name: 'Bay Area Rivian', email: 'reservations@barivian.com' })
+      .string();
+    ```
+  </Tab>
+
+  <Tab title="Multiple vehicles">
+    When a customer is considering several models, use `ADFBuilder` and call `.vehicle()` on the inner prospect builder once per model. All vehicles are wrapped in a single `<prospect>` element.
+
+    ```typescript
+    import { ADFBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFBuilder()
+      .prospect(p => p
+        .vehicle({ year: 2025, make: 'Honda', model: 'CR-V', interest: 'buy', status: 'new' })
+        .vehicle({ year: 2025, make: 'Toyota', model: 'RAV4', interest: 'buy', status: 'new' })
+        .vehicle({ year: 2025, make: 'Mazda', model: 'CX-5', interest: 'buy', status: 'new' })
+        .customer({ firstName: 'Sam', email: 'sam@example.com', timeFrame: 'Next month' })
+        .vendor({ name: 'Metro Auto Group', email: 'leads@metroauto.com' })
+      )
+      .string();
+    ```
+
+    `ADFBuilder` also accepts `.prospect()` calls with a plain `ProspectInput` object if you prefer the data-object style over the builder callback.
+  </Tab>
+</Tabs>
+
+## Output methods
+
+Both `ADFProspectBuilder` and `ADFBuilder` expose the same two terminal methods:
+
+| Method | Return type | Use when |
+|---|---|---|
+| `.string()` | `string` | Writing to a file, passing to a string-based HTTP client, or storing in a database |
+| `.xml()` | `Blob` (`Content-Type: application/xml`) | Passing directly to `fetch` as a request body, or attaching to an email |
+
+```typescript
+// String output — most common
+const xmlString = new ADFProspectBuilder()
+  .vehicle({ year: 2025, make: 'Toyota', model: 'Camry', interest: 'buy', status: 'new' })
+  .customer({ firstName: 'Jane', email: 'jane@example.com' })
+  .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+  .string();
+
+// Blob output — send directly with fetch, no Content-Type header needed
+const blob = new ADFProspectBuilder()
+  .vehicle({ year: 2025, make: 'Toyota', model: 'Camry', interest: 'buy', status: 'new' })
+  .customer({ firstName: 'Jane', email: 'jane@example.com' })
+  .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+  .xml();
+
+await fetch(dealerEndpoint, { method: 'POST', body: blob });
+```
+
+## One-shot factory
+
+For simple cases where you already have all the lead data available at once, `generateProspect()` accepts a `ProspectInput` object and returns the XML string directly, skipping the builder entirely.
+
+```typescript
+import { generateProspect } from '@uhteddy/adf-kit';
+
+const xml = generateProspect({
+  vehicle: {
+    year: 2025,
+    make: 'Toyota',
+    model: 'Camry',
+    interest: 'buy',
+    status: 'new',
+    price: 32_500,
+  },
+  customer: {
+    firstName: 'Jane',
+    lastName: 'Smith',
+    email: 'jane.smith@example.com',
+    phone: '555-867-5309',
+  },
+  vendor: {
+    name: 'Sunrise Toyota',
+    email: 'leads@sunrisetoyota.com',
+  },
+});
+```
+
+`generateADF()` works the same way for multi-prospect documents: pass an `ADFInput` with a `prospects` array and get back an XML string.

@@ -1,0 +1,162 @@
+---
+title: "Round-tripping ADF documents with adf-kit"
+description: "Parse inbound ADF XML into a typed document, modify prospect data in place, and serialize it back to valid XML using ADFparse and ADFserialize."
+---
+
+A round-trip in adf-kit means parsing an ADF XML string into a typed `ADFDocument` object, mutating that object in memory, and then serializing it back to XML. This is the right approach for lead-forwarding pipelines, archiving workflows, and status-update scenarios where you receive ADF from one system and need to re-transmit it — possibly with modifications — to another. This page shows how to do each part and what to keep in mind about what the serializer preserves.
+
+## Parse → modify → serialize
+
+The core round-trip pattern uses `ADFparse` to deserialize and `ADFserialize` to re-serialize. Both are top-level exports from `@uhteddy/adf-kit`.
+
+```typescript
+import { ADFparse, ADFserialize } from '@uhteddy/adf-kit';
+
+const doc = ADFparse(inboundXml);
+doc.prospects[0].status = 'resend';
+const updatedXml = ADFserialize(doc);
+```
+
+`ADFserialize` accepts any `ADFDocument` — whether it came from `ADFparse`, from `ADFProspectBuilder.build()`, or from `buildDocument()` — and returns a complete ADF XML string with the `<?ADF version "1.0"?>` processing instruction and standard XML declaration.
+
+<Note>
+  The serializer produces clean, re-indented XML. Whitespace, comments, and attribute ordering from the original document are not preserved — only the typed data is round-tripped. If exact byte-for-byte fidelity to the source is important, store the original string alongside the parsed document.
+</Note>
+
+## Use cases
+
+<AccordionGroup>
+  <Accordion title="Forwarding leads between systems">
+    When an aggregator sends you ADF and you need to forward it to a dealer CRM, parse it, optionally enrich it with your own `provider` data, and re-serialize. The output is a valid ADF document that any spec-compliant receiver can parse.
+
+    ```typescript
+    import { ADFparse, ADFserialize } from '@uhteddy/adf-kit';
+
+    const doc = ADFparse(inboundXml);
+
+    // Stamp with our forwarding provider info
+    doc.prospects[0].provider = {
+      ids: [],
+      name: { value: 'LeadBridge', part: 'full', type: 'business' },
+      service: 'Lead Forwarding',
+      url: undefined,
+      email: 'ops@leadbridge.example.com',
+      phone: undefined,
+      contact: undefined,
+    };
+
+    const forwardXml = ADFserialize(doc);
+    await fetch(dealerEndpoint, {
+      method: 'POST',
+      body: forwardXml,
+      headers: { 'Content-Type': 'application/xml' },
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Archiving and status updates">
+    CRM systems often re-transmit leads with `status: 'resend'` when a previous delivery failed or when the lead needs to be re-processed. Parse the original document, update the status, and serialize.
+
+    ```typescript
+    import { ADFparse, ADFserialize } from '@uhteddy/adf-kit';
+
+    const doc = ADFparse(inboundXml);
+    doc.prospects[0].status = 'resend';
+    const updatedXml = ADFserialize(doc);
+    ```
+  </Accordion>
+
+  <Accordion title="Serializing builder output">
+    You can also serialize documents produced by `ADFProspectBuilder` or `ADFBuilder` by calling `.build()` to get the `ADFDocument` and then passing it to `ADFserialize`. This is useful when you need the intermediate object for validation before writing to a file or database.
+
+    ```typescript
+    import { ADFProspectBuilder, ADFserialize, ADFvalidate } from '@uhteddy/adf-kit';
+
+    const prospectDoc = {
+      version: '1.0',
+      prospects: [
+        new ADFProspectBuilder()
+          .vehicle({ year: 2025, make: 'Toyota', model: 'Camry', interest: 'buy', status: 'new' })
+          .customer({ firstName: 'Jane', email: 'jane@example.com' })
+          .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+          .build(),
+      ],
+    };
+
+    const result = ADFvalidate(prospectDoc);
+    if (result.valid) {
+      const xml = ADFserialize(prospectDoc);
+      await writeFile('lead.xml', xml);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Mutating parsed documents
+
+The `ADFDocument` returned by `ADFparse` is a plain JavaScript object — all properties are mutable. You can change scalar values, push items into arrays, or replace nested objects entirely.
+
+<Steps>
+  <Step title="Update the prospect status">
+    The most common mutation. Mark the lead as a resend before re-transmitting.
+
+    ```typescript
+    doc.prospects[0].status = 'resend';
+    ```
+  </Step>
+
+  <Step title="Add or replace customer contact info">
+    Push a new email or phone into the contact arrays if the customer provided updated details.
+
+    ```typescript
+    doc.prospects[0].customer.contact.emails.push({
+      value: 'new-address@example.com',
+      preferredContact: true,
+    });
+    ```
+  </Step>
+
+  <Step title="Modify vehicle data">
+    Update the stock number, condition, or price on a vehicle that has been matched to live inventory.
+
+    ```typescript
+    const vehicle = doc.prospects[0].vehicles[0]!;
+    vehicle.stock = 'INV-99231';
+    vehicle.condition = 'excellent';
+    ```
+  </Step>
+
+  <Step title="Serialize the modified document">
+    Pass the mutated document to `ADFserialize` to produce the updated XML string.
+
+    ```typescript
+    const xml = ADFserialize(doc);
+    ```
+  </Step>
+</Steps>
+
+## Validate after modification
+
+<Tip>
+  After mutating a parsed document, run `ADFvalidate` before re-serializing. Modifications can introduce issues — for example, adding an empty email string or pushing a vehicle with a missing model — that the serializer will emit faithfully into the output XML, potentially causing the receiver to reject the document.
+</Tip>
+
+```typescript
+import { ADFparse, ADFvalidate, ADFserialize } from '@uhteddy/adf-kit';
+
+const doc = ADFparse(inboundXml);
+
+// Apply your modifications
+doc.prospects[0].status = 'resend';
+
+// Validate before re-serializing
+const result = ADFvalidate(doc);
+if (!result.valid) {
+  for (const issue of result.errors) {
+    console.error(`[${issue.path}] ${issue.message}`);
+  }
+  throw new Error('Modified document failed ADF validation — aborting re-transmit');
+}
+
+const xml = ADFserialize(doc);
+```

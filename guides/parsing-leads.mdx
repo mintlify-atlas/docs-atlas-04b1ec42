@@ -1,0 +1,131 @@
+---
+title: "Parsing inbound ADF XML documents"
+description: "Use ADFparse to convert raw ADF 1.0 XML into typed TypeScript objects, then extract customer, vendor, and vehicle data from the resulting ADFDocument."
+---
+
+When ADF leads arrive from external aggregators, CRM webhooks, or email attachments, adf-kit's `ADFparse` function converts the raw XML string into a fully-typed `ADFDocument` object. This page covers how to call the parser, navigate the resulting data structure, access contact information, and handle the errors the parser can throw.
+
+<Tip>
+  Always wrap `ADFparse` calls in a `try/catch` block. The parser throws `ADFParseError` on malformed XML or structurally invalid ADF documents, and unhandled errors will crash your process.
+</Tip>
+
+## Basic parse
+
+Import `ADFparse` from `@uhteddy/adf-kit` and pass the raw XML string. The returned `ADFDocument` is a fully-typed object — no casting required.
+
+```typescript
+import { ADFparse } from '@uhteddy/adf-kit';
+
+const doc = ADFparse(xmlString);
+// doc.prospects[0].vehicles[0].make  → "Toyota"
+// doc.prospects[0].customer.contact.emails[0].value  → "jane@example.com"
+```
+
+<Note>
+  `ADFparse` is lenient by design: it coerces attribute values to their expected types and fills in enum defaults for unrecognised values rather than throwing. This means a structurally valid but semantically dubious document will parse successfully. Use `ADFvalidate()` afterward to enforce the ADF 1.0 spec rules. See [Validating ADF documents](/guides/validation) for details.
+</Note>
+
+## Extracting lead data
+
+The parsed document contains one or more `ADFProspect` objects in `doc.prospects`. Each prospect holds the request date, status, one or more vehicles, a customer, a vendor, and an optional provider.
+
+```typescript
+import { ADFparse } from '@uhteddy/adf-kit';
+
+const doc = ADFparse(xmlString);
+
+for (const prospect of doc.prospects) {
+  const { customer, vendor, vehicles, requestDate, status } = prospect;
+
+  const name = customer.contact.names.find(n => n.part === 'first')?.value;
+  const email = customer.contact.emails[0]?.value;
+  const phone = customer.contact.phones[0]?.value;
+
+  for (const vehicle of vehicles) {
+    console.log(`${requestDate} | ${status} | ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
+    console.log(`  Customer: ${name} <${email}> ${phone}`);
+    console.log(`  Dealer:   ${vendor.vendorName}`);
+  }
+}
+```
+
+## ADFProspect properties
+
+The table below lists the top-level properties available on each `ADFProspect` object after parsing.
+
+| Property | Type | Description |
+|---|---|---|
+| `requestDate` | `string` (ISO 8601) | When the lead was created |
+| `status` | `'new' \| 'resend'` | Whether this is a new lead or a re-delivery |
+| `ids` | `ADFId[]` | Optional IDs assigned by the originating system |
+| `vehicles` | `ADFVehicle[]` | One or more vehicles the customer is interested in |
+| `customer` | `ADFCustomer` | Buyer details and purchase timeframe |
+| `vendor` | `ADFVendor` | Receiving dealership or entity |
+| `provider` | `ADFProvider \| undefined` | Lead source (ad network, listing site, etc.) |
+
+## Accessing contact info
+
+Contact information lives on `customer.contact` and `vendor.contact`. Each contact object holds arrays of names, emails, and phones, and an optional address.
+
+<Steps>
+  <Step title="Find the customer's first name">
+    Names are stored as an array of `ADFName` objects with a `part` attribute. Use `.find()` to locate the part you need.
+
+    ```typescript
+    const firstName = prospect.customer.contact.names.find(n => n.part === 'first')?.value;
+    const lastName  = prospect.customer.contact.names.find(n => n.part === 'last')?.value;
+    ```
+  </Step>
+
+  <Step title="Read the primary email">
+    Emails are in `contact.emails`. The first entry is the preferred contact address when `preferredContact` is `true`.
+
+    ```typescript
+    const primaryEmail = prospect.customer.contact.emails.find(e => e.preferredContact)?.value
+      ?? prospect.customer.contact.emails[0]?.value;
+    ```
+  </Step>
+
+  <Step title="Read phone numbers">
+    Phones carry a `type` (`'voice'`, `'cellphone'`, `'fax'`, `'pager'`) and a `time` preference. Multiple numbers may be present.
+
+    ```typescript
+    const cell = prospect.customer.contact.phones.find(p => p.type === 'cellphone')?.value;
+    const preferred = prospect.customer.contact.phones.find(p => p.preferredContact)?.value;
+    ```
+  </Step>
+
+  <Step title="Read the vendor name">
+    The dealership name is on `vendor.vendorName` (not inside `vendor.contact`).
+
+    ```typescript
+    const dealerName = prospect.vendor.vendorName;
+    const dealerEmail = prospect.vendor.contact.emails[0]?.value;
+    ```
+  </Step>
+</Steps>
+
+## Error handling
+
+`ADFparse` throws `ADFParseError` in two situations: the raw string is not valid XML, or a structurally required ADF element (such as `<requestdate>`, `<vehicle>`, `<customer>`, or `<vendor>`) is missing from the document. Always catch this error at the call site.
+
+```typescript
+import { ADFparse, ADFParseError } from '@uhteddy/adf-kit';
+
+let doc;
+try {
+  doc = ADFparse(xmlString);
+} catch (err) {
+  if (err instanceof ADFParseError) {
+    // Malformed XML or missing required ADF elements
+    console.error('Could not parse ADF:', err.message);
+    process.exit(1);
+  }
+  throw err; // Re-throw unexpected errors
+}
+
+// doc is now safe to use
+console.log(doc.prospects.length, 'prospect(s) parsed');
+```
+
+`ADFParseError` extends the native `Error` class and adds a `cause` property that holds the underlying error when the failure came from the XML parser itself.

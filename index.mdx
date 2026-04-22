@@ -1,97 +1,86 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "adf-kit: Parse and generate ADF 1.0 in TypeScript"
+description: "Parse, validate, generate, and serialize Auto-lead Data Format XML with full TypeScript types. Zero runtime dependencies."
 ---
 
-## Setting up
+adf-kit is a TypeScript library for working with **Auto-lead Data Format (ADF) 1.0** — the XML standard used by automotive CRMs, dealer management systems, and lead aggregators. It gives you a fluent builder API for generating leads, a lenient parser for inbound XML, a spec-compliant validator, and a serializer for round-tripping documents.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="box" href="/installation">
+    Add adf-kit to your project with npm, bun, pnpm, or yarn
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Generate your first ADF lead in under a minute
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Generating Leads" icon="file-export" href="/guides/generating-leads">
+    Build new car, used car, lease, trade-in, and test drive leads
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Parsing Leads" icon="file-import" href="/guides/parsing-leads">
+    Parse inbound ADF XML into fully-typed TypeScript objects
   </Card>
-</Columns>
+  <Card title="Validation" icon="shield-check" href="/guides/validation">
+    Validate documents against the ADF 1.0 spec with structured errors
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/parse">
+    Full reference for every function, builder, type, and error class
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## What you can do with adf-kit
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Fluent builder API" icon="wand-magic-sparkles">
+    `ADFProspectBuilder` and `ADFBuilder` let you construct valid ADF leads with TypeScript autocompletion — no need to read the spec.
+  </Card>
+  <Card title="Lenient XML parser" icon="diagram-project">
+    `ADFparse` converts any ADF 1.0 XML string into a strongly-typed `ADFDocument` object, coercing values and filling defaults.
+  </Card>
+  <Card title="Spec-compliant validation" icon="list-check">
+    `ADFvalidate` checks required fields, VIN format, ISO date strings, currency codes, country codes, and more — without throwing.
+  </Card>
+  <Card title="Zero runtime deps" icon="feather">
+    The distributed bundle ships with no production dependencies. Fast installs, no supply-chain surprises.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Quick example
 
-## Need inspiration?
+```typescript
+import { ADFProspectBuilder } from '@uhteddy/adf-kit';
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+const xml = new ADFProspectBuilder()
+  .vehicle({
+    year: 2025,
+    make: 'Toyota',
+    model: 'Camry',
+    trim: 'XSE',
+    interest: 'buy',
+    status: 'new',
+    price: 32_500,
+  })
+  .customer({
+    firstName: 'Jane',
+    lastName: 'Smith',
+    email: 'jane.smith@example.com',
+    phone: '555-867-5309',
+  })
+  .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+  .string();
+```
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    npm install @uhteddy/adf-kit
+    ```
+  </Step>
+  <Step title="Build a lead with the fluent API">
+    Use `ADFProspectBuilder` to set the vehicle, customer, and vendor, then call `.string()` to get the XML output.
+  </Step>
+  <Step title="Parse inbound XML">
+    Use `ADFparse` to convert incoming ADF XML strings into typed `ADFDocument` objects your CRM code can work with directly.
+  </Step>
+  <Step title="Validate before processing">
+    Run `ADFvalidate` on any parsed document to get structured errors and warnings without throwing exceptions.
+  </Step>
+</Steps>

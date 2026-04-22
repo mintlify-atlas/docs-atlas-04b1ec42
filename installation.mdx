@@ -1,0 +1,103 @@
+---
+title: "Installing adf-kit in your TypeScript project"
+description: "Add @uhteddy/adf-kit to any TypeScript 5+ project using npm, bun, pnpm, or yarn, then import the main exports to start working with ADF 1.0 documents."
+---
+
+This page walks you through adding `@uhteddy/adf-kit` to a TypeScript project, verifying the required environment, and importing the functions and classes you will use most often. The package ships as an ESM bundle with full type declarations, so no additional configuration is needed beyond the standard TypeScript setup described below.
+
+## Install the package
+
+<CodeGroup>
+
+```bash npm
+npm install @uhteddy/adf-kit
+```
+
+```bash bun
+bun add @uhteddy/adf-kit
+```
+
+```bash pnpm
+pnpm add @uhteddy/adf-kit
+```
+
+```bash yarn
+yarn add @uhteddy/adf-kit
+```
+
+</CodeGroup>
+
+## Requirements
+
+**TypeScript 5 or later** is required. adf-kit uses TypeScript's phantom type parameter feature to enforce that `ADFProspectBuilder` terminal methods (`.string()`, `.xml()`) are only callable after all required fields have been set — this relies on conditional and mapped types that require TS 5+.
+
+**ESM module format** is also required. The package is published as ES Modules (`"type": "module"` in its `package.json`). Your project must use ESM as well. Set `"type": "module"` in your `package.json` and use `"module": "ESNext"` (or `"NodeNext"`) in your `tsconfig.json`.
+
+```json tsconfig.json (minimum)
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true
+  }
+}
+```
+
+<Tip>
+  TypeScript is a peer dependency of adf-kit, not a direct dependency. Your project must provide it. Run `npm install --save-dev typescript` if you have not already, then verify `tsc --version` reports 5.0.0 or higher.
+</Tip>
+
+## Import the main exports
+
+The four functions you will reach for most often:
+
+```typescript
+import {
+  ADFProspectBuilder,
+  ADFparse,
+  ADFvalidate,
+  ADFserialize,
+} from '@uhteddy/adf-kit';
+```
+
+For multi-prospect documents and one-shot factory functions:
+
+```typescript
+import {
+  ADFBuilder,
+  generateProspect,
+  generateADF,
+  buildProspect,
+  buildDocument,
+} from '@uhteddy/adf-kit';
+```
+
+For TypeScript types used in function signatures and your own interfaces:
+
+```typescript
+import type {
+  ADFDocument,
+  ADFProspect,
+  ADFVehicle,
+  ADFCustomer,
+  ADFVendor,
+  ADFProvider,
+  ValidationResult,
+  ValidationIssue,
+  ProspectInput,
+  VehicleInput,
+  CustomerInput,
+  VendorInput,
+} from '@uhteddy/adf-kit';
+```
+
+For error classes thrown during parsing:
+
+```typescript
+import { ADFParseError, ADFValidationError } from '@uhteddy/adf-kit';
+```
+
+<Note>
+  adf-kit has zero runtime dependencies. The libraries used internally during the build (`fast-xml-parser`, `currency-codes-ts`, `i18n-iso-countries`) are bundled into the distributed package and will not appear in your `node_modules`.
+</Note>

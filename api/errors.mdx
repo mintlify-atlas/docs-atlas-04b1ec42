@@ -1,0 +1,230 @@
+---
+title: "Error classes and validation types"
+description: "Reference for ADFParseError, ADFValidationError, ValidationResult, and ValidationIssue — the error handling and validation types exported by adf-kit."
+---
+
+adf-kit distinguishes clearly between two failure modes: a parse failure (malformed or structurally invalid XML) and a validation failure (well-formed XML that violates ADF business rules). This page documents the error classes and validation interfaces that cover both cases.
+
+---
+
+## ADFParseError
+
+Thrown by `ADFparse` when the raw XML input cannot be read into a typed `ADFDocument`. This includes malformed XML syntax as well as documents that are missing required structural elements defined by the ADF spec.
+
+```typescript
+class ADFParseError extends Error {
+  readonly name = 'ADFParseError';
+  readonly cause?: unknown;
+}
+```
+
+<ResponseField name="name" type="'ADFParseError'" required>
+  Always `"ADFParseError"`. Use this to distinguish the error class in catch blocks without relying on `instanceof`.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Human-readable description of what caused the parse failure.
+</ResponseField>
+
+<ResponseField name="cause" type="unknown">
+  The underlying error from the XML parser or internal processing, if available.
+</ResponseField>
+
+**Conditions that trigger `ADFParseError`:**
+
+- Malformed XML (syntax errors, unclosed tags, invalid entities)
+- Missing `<adf>` root element
+- Missing `<prospect>` element
+- Missing `<requestdate>` on a prospect
+- Missing `<vehicle>` on a prospect
+- Missing `<customer>` on a prospect
+- Missing `<vendor>` or `<contact>` on a prospect
+
+<Note>
+  `ADFparse` **always** throws `ADFParseError` on failure. Wrap every call in a `try/catch` block — there is no error-returning variant of the parse function.
+</Note>
+
+```typescript title="handling ADFParseError"
+import { ADFparse, ADFParseError } from '@uhteddy/adf-kit';
+
+try {
+  const doc = ADFparse(rawXml);
+  // doc is ADFDocument — safe to use
+} catch (err) {
+  if (err instanceof ADFParseError) {
+    console.error('ADF parse failed:', err.message);
+    if (err.cause) {
+      console.error('Caused by:', err.cause);
+    }
+  } else {
+    // Re-throw unexpected errors
+    throw err;
+  }
+}
+```
+
+---
+
+## ADFValidationError
+
+An error class exported from adf-kit that you can use when building your own validation pipelines. It carries a list of `ValidationIssue` entries and is designed to be thrown by your application code after calling `ADFvalidate` and finding errors — for example, to propagate validation failures up a call stack as a typed exception.
+
+```typescript
+class ADFValidationError extends Error {
+  readonly name = 'ADFValidationError';
+  readonly issues: ValidationIssue[];
+}
+```
+
+<ResponseField name="name" type="'ADFValidationError'" required>
+  Always `"ADFValidationError"`.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Human-readable summary of the validation failure.
+</ResponseField>
+
+<ResponseField name="issues" type="ValidationIssue[]" required>
+  The list of validation issues associated with this error. Inspect these to understand exactly which fields failed and why.
+
+  <Expandable title="properties">
+    See [ValidationIssue](#validationissue) below.
+  </Expandable>
+</ResponseField>
+
+<Note>
+  `ADFvalidate` **never** throws — it always returns a `ValidationResult`. `ADFValidationError` is provided as a utility class for your own code to throw when you want to surface validation failures as typed exceptions in your application.
+</Note>
+
+```typescript title="using ADFValidationError in your own code"
+import { ADFvalidate, ADFValidationError } from '@uhteddy/adf-kit';
+
+const result = ADFvalidate(doc);
+if (!result.valid) {
+  throw new ADFValidationError(
+    `ADF document has ${result.errors.length} spec violation(s)`,
+    result.errors,
+  );
+}
+```
+
+---
+
+## ValidationResult
+
+The object returned by `ADFvalidate`. It always returns this structure — never throws.
+
+```typescript
+interface ValidationResult {
+  valid: boolean;
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+}
+```
+
+<ResponseField name="valid" type="boolean" required>
+  `true` if there are zero error-severity issues. May still be `true` even when `warnings` is non-empty.
+</ResponseField>
+
+<ResponseField name="errors" type="ValidationIssue[]" required>
+  Issues with severity `"error"`. A non-empty array means `valid` is `false`.
+</ResponseField>
+
+<ResponseField name="warnings" type="ValidationIssue[]" required>
+  Issues with severity `"warning"`. Warnings do not affect `valid` — they highlight conditions that are technically allowed but may indicate problems.
+</ResponseField>
+
+<Tip>
+  Always check `result.valid` before processing or forwarding an `ADFDocument`. Even when the XML parses successfully, the document may be missing required fields that ADF-compliant recipients will reject.
+</Tip>
+
+---
+
+## ValidationIssue
+
+A single finding from a validation pass — either an error or a warning about a specific field.
+
+```typescript
+interface ValidationIssue {
+  path: string;
+  message: string;
+  severity: IssueSeverity;
+}
+```
+
+<ResponseField name="path" type="string" required>
+  Dot-separated path to the field that triggered this issue, using array index notation where applicable. For example: `"prospects[0].customer.contact"` or `"prospects[0].vehicles[1].vin"`.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Human-readable description of the issue, suitable for logging or displaying to a developer.
+</ResponseField>
+
+<ResponseField name="severity" type="IssueSeverity" required>
+  Either `"error"` (the document violates the ADF spec) or `"warning"` (the document is valid but has a potentially problematic condition).
+</ResponseField>
+
+---
+
+## IssueSeverity
+
+```typescript
+type IssueSeverity = 'error' | 'warning';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"error"` | The field violates a requirement of the ADF 1.0 specification. The document should not be forwarded to recipients. |
+| `"warning"` | The field has a condition that may cause problems but does not strictly violate the spec. |
+
+---
+
+## Complete error handling example
+
+The following example shows how to handle both parse failures and validation issues in a typical ADF processing pipeline.
+
+```typescript title="complete error handling"
+import {
+  ADFparse,
+  ADFvalidate,
+  ADFParseError,
+  ADFValidationError,
+} from '@uhteddy/adf-kit';
+import type { ValidationIssue } from '@uhteddy/adf-kit';
+
+async function processLead(rawXml: string): Promise<void> {
+  // Step 1: Parse — may throw ADFParseError
+  let doc;
+  try {
+    doc = ADFparse(rawXml);
+  } catch (err) {
+    if (err instanceof ADFParseError) {
+      console.error('Could not parse ADF XML:', err.message);
+      return;
+    }
+    throw err;
+  }
+
+  // Step 2: Validate — never throws, always returns ValidationResult
+  const result = ADFvalidate(doc);
+
+  if (!result.valid) {
+    console.error('ADF document has validation errors:');
+    result.errors.forEach((issue: ValidationIssue) => {
+      console.error(`  [${issue.path}] ${issue.message}`);
+    });
+    return;
+  }
+
+  if (result.warnings.length > 0) {
+    console.warn('ADF document has warnings:');
+    result.warnings.forEach((issue: ValidationIssue) => {
+      console.warn(`  [${issue.path}] ${issue.message}`);
+    });
+  }
+
+  // Step 3: Document is valid — proceed with processing
+  const prospect = doc.prospects[0];
+  console.log('Processing lead for:', prospect.customer.contact.names[0]?.value);
+}
+```

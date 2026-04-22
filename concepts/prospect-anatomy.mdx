@@ -1,0 +1,263 @@
+---
+title: "Anatomy of an ADF prospect and its sub-types"
+description: "A field-by-field breakdown of ADFProspect and every sub-type: customer, vendor, provider, contact, and timeFrame as modeled in adf-kit."
+---
+
+An ADF prospect is the atomic unit of the ADF 1.0 format — it represents a single automotive lead sent from a buyer (or lead aggregator) to a dealer. In adf-kit, the `ADFProspect` interface captures everything the spec requires: the request timestamp, lead status, the vehicle or vehicles the buyer is interested in, the buyer's own contact information, the receiving dealer, and an optional lead-source provider.
+
+<Note>
+  Every prospect **must** contain at least one vehicle, a customer, and a vendor. These three fields are enforced by both the TypeScript types and `ADFvalidate`. A prospect missing any of them will produce validation errors.
+</Note>
+
+## Top-level prospect fields
+
+<ResponseField name="requestDate" type="ISO8601DateTime" required>
+  The date and time the lead was created, in ISO 8601 format. adf-kit accepts any parseable date string or `Date` object via `ProspectInput.requestDate`; when omitted it defaults to the current time. The serializer always writes the canonical `CCYY-MM-DDThh:mm:ssZ` form required by the spec.
+</ResponseField>
+
+<ResponseField name="status" type="'new' | 'resend'" required>
+  Whether this is a new lead (`'new'`) or a re-transmission of a previously sent lead (`'resend'`). Defaults to `'new'` when building with `ADFProspectBuilder` or `generateProspect`.
+</ResponseField>
+
+<ResponseField name="ids" type="ADFId[]" required>
+  An array of tracking identifiers that follow the prospect across systems. Each entry has:
+
+  <Expandable title="ADFId properties">
+    <ResponseField name="value" type="string" required>
+      The identifier string.
+    </ResponseField>
+    <ResponseField name="source" type="string">
+      Name of the system that created this id. Required by the ADF spec — `ADFvalidate` raises an error when `source` is absent.
+    </ResponseField>
+    <ResponseField name="sequence" type="number">
+      Ordinal tracking the history of this datum across systems.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="vehicles" type="ADFVehicle[]" required>
+  One or more vehicles the buyer is interested in. At least one entry is required by the spec. See the [vehicle fields reference](/concepts/vehicle-fields) for a complete breakdown of every field on `ADFVehicle`.
+</ResponseField>
+
+<ResponseField name="customer" type="ADFCustomer" required>
+  The buyer. See the [ADFCustomer](#adfcustomer) section below.
+</ResponseField>
+
+<ResponseField name="vendor" type="ADFVendor" required>
+  The dealership or selling entity receiving the lead. See the [ADFVendor](#adfvendor) section below.
+</ResponseField>
+
+<ResponseField name="provider" type="ADFProvider">
+  Optional. The lead source or aggregator that originated the lead (e.g. AutoTrader, Cars.com, a dealer's own website widget). See the [ADFProvider](#adfprovider) section below.
+</ResponseField>
+
+---
+
+## ADFCustomer
+
+The `customer` field holds everything about the buyer: their contact information, optional tracking ids, a purchase timeframe, and free-text comments.
+
+<ResponseField name="contact" type="ADFContact" required>
+  The buyer's contact information. See [ADFContact](#adfcontact) for the full field breakdown.
+</ResponseField>
+
+<ResponseField name="ids" type="ADFId[]" required>
+  Tracking ids for this customer record, following the same `{ value, source, sequence }` shape as prospect ids.
+</ResponseField>
+
+<ResponseField name="timeFrame" type="ADFTimeFrame">
+  The buyer's intended purchase window. See [ADFTimeFrame](#adftimeframe) below.
+</ResponseField>
+
+<ResponseField name="comments" type="string">
+  Free-text notes from the buyer — additional context about what they want, trade-in details, or any other information they submitted with the lead.
+</ResponseField>
+
+### ADFTimeFrame
+
+`ADFTimeFrame` expresses when the buyer intends to purchase. All three fields are optional, but `ADFvalidate` warns if the object is present with none of them set.
+
+<ResponseField name="description" type="string">
+  A human-readable description of the timeframe, e.g. `"Within 30 days"` or `"This weekend if possible"`. When using `CustomerInput`, passing a plain string to `timeFrame` sets this field directly.
+</ResponseField>
+
+<ResponseField name="earliestDate" type="ISO8601Date">
+  The earliest acceptable purchase date in ISO 8601 date format (`CCYY-MM-DD`). `ADFvalidate` warns if this value is after `latestDate`.
+</ResponseField>
+
+<ResponseField name="latestDate" type="ISO8601Date">
+  The latest acceptable purchase date in ISO 8601 date format (`CCYY-MM-DD`).
+</ResponseField>
+
+---
+
+## ADFVendor
+
+The `vendor` represents the dealership or selling entity that receives the lead.
+
+<ResponseField name="vendorName" type="string" required>
+  The legal or display name of the dealership, e.g. `"Sunrise Toyota"`. Required by the spec and validated by `ADFvalidate`.
+</ResponseField>
+
+<ResponseField name="ids" type="ADFId[]" required>
+  Tracking ids for this vendor record.
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The dealer's website URL.
+</ResponseField>
+
+<ResponseField name="contact" type="ADFContact" required>
+  Contact information for the dealership. When using `VendorInput`, this is constructed automatically from the `name`, `email`, and `phone` fields you provide.
+</ResponseField>
+
+---
+
+## ADFProvider
+
+`ADFProvider` is optional on a prospect. It identifies the lead source — the aggregator, portal, or service that generated the lead and delivered it to the dealer.
+
+<ResponseField name="name" type="ADFName" required>
+  The name of the provider as an `ADFName` object (with `value`, `part`, and `type`). When using `ProviderInput`, pass a plain string to `name` and the builder creates the `ADFName` automatically with `part: 'full'` and `type: 'business'`.
+</ResponseField>
+
+<ResponseField name="ids" type="ADFId[]" required>
+  Tracking ids for this provider record.
+</ResponseField>
+
+<ResponseField name="service" type="string">
+  The specific service or product within the provider that originated the lead, e.g. `"New Car Search"`.
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The provider's website URL.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  A general reply address for lead-related issues at the provider.
+</ResponseField>
+
+<ResponseField name="phone" type="string">
+  Provider contact phone number.
+</ResponseField>
+
+<ResponseField name="contact" type="ADFContact">
+  Optional named contact at the provider. Uses the same `ADFContact` shape as customer and vendor contacts.
+</ResponseField>
+
+---
+
+## ADFContact
+
+`ADFContact` is the shared contact block used by `ADFCustomer`, `ADFVendor`, and optionally `ADFProvider`. The validator requires at least one name and at least one email or phone on every contact.
+
+<ResponseField name="names" type="ADFName[]" required>
+  One or more name segments. Each entry has:
+
+  <Expandable title="ADFName properties">
+    <ResponseField name="value" type="string" required>
+      The name string.
+    </ResponseField>
+    <ResponseField name="part" type="'surname' | 'first' | 'middle' | 'last' | 'full'" required>
+      Which part of the name this segment represents.
+    </ResponseField>
+    <ResponseField name="type" type="'business' | 'individual'" required>
+      Whether this is a person's name (`'individual'`) or a company name (`'business'`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="emails" type="ADFEmail[]" required>
+  Zero or more email addresses. At least one email or one phone is required. Each entry has:
+
+  <Expandable title="ADFEmail properties">
+    <ResponseField name="value" type="string" required>
+      The email address string.
+    </ResponseField>
+    <ResponseField name="preferredContact" type="boolean" required>
+      Whether the buyer prefers to be contacted at this address. The generator sets `true` on the first email when using `ContactInput`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="phones" type="ADFPhone[]" required>
+  Zero or more phone numbers. At least one email or one phone is required. Each entry has:
+
+  <Expandable title="ADFPhone properties">
+    <ResponseField name="value" type="string" required>
+      The phone number string.
+    </ResponseField>
+    <ResponseField name="type" type="'voice' | 'fax' | 'cellphone' | 'pager'" required>
+      The type of phone line.
+    </ResponseField>
+    <ResponseField name="time" type="'morning' | 'afternoon' | 'evening' | 'nopreference' | 'day'" required>
+      Preferred time to call.
+    </ResponseField>
+    <ResponseField name="preferredContact" type="boolean" required>
+      Whether this is the preferred contact number.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="address" type="ADFAddress">
+  Optional mailing or physical address. Has:
+
+  <Expandable title="ADFAddress properties">
+    <ResponseField name="streets" type="ADFStreet[]" required>
+      Up to 5 street lines. Each `ADFStreet` has a `value` (string) and an optional `line` (the line number as a string, `"1"`–`"5"`). The ADF spec limits addresses to 5 street lines; `ADFvalidate` raises an error if more are present.
+    </ResponseField>
+    <ResponseField name="apartment" type="string">
+      Apartment or suite number.
+    </ResponseField>
+    <ResponseField name="city" type="string">
+      City name.
+    </ResponseField>
+    <ResponseField name="regionCode" type="string">
+      State or province code (2-character recommended for North America, e.g. `"TX"`).
+    </ResponseField>
+    <ResponseField name="postalCode" type="string">
+      ZIP or postal code.
+    </ResponseField>
+    <ResponseField name="country" type="Alpha2Code">
+      ISO 3166-1 alpha-2 country code, e.g. `"US"`. `ADFvalidate` warns on unrecognized codes.
+    </ResponseField>
+    <ResponseField name="type" type="'work' | 'home' | 'delivery'">
+      Address category.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="primaryContact" type="boolean" required>
+  Indicates this is the primary contact when multiple contact blocks exist on an entity.
+</ResponseField>
+
+---
+
+## Building a prospect
+
+The `ADFProspectBuilder` simplifies constructing a valid prospect. Here is an example covering the most commonly used sub-types:
+
+```typescript
+import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFProspectBuilder()
+  .vehicle({
+    year: 2025,
+    make: 'Toyota',
+    model: 'Camry',
+    interest: 'buy',
+    status: 'new',
+  })
+  .customer({
+    firstName: 'Jane',
+    lastName: 'Smith',
+    email: 'jane.smith@example.com',
+    phone: '555-867-5309',
+    address: { city: 'Austin', regionCode: 'TX', postalCode: '78701' },
+    timeFrame: { description: 'Within 30 days', earliest: '2025-05-01', latest: '2025-05-31' },
+    comments: 'Prefer silver or white exterior.',
+  })
+  .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com', phone: '512-555-0100' })
+  .provider({ name: 'AutoTrader', service: 'New Car Search', url: 'https://autotrader.com' })
+  .string();
+```

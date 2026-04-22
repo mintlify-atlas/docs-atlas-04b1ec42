@@ -1,0 +1,152 @@
+---
+title: "ADFparse — parse ADF 1.0 XML into a typed document"
+description: "Convert an ADF 1.0 XML string into a typed ADFDocument. Covers lenient parsing behavior, XML preprocessing, ADFParseError causes, and parse + validate."
+---
+
+The `ADFparse` function is the entry point for reading inbound ADF leads in adf-kit. It accepts a raw ADF 1.0 XML string and returns a fully-typed `ADFDocument` object whose properties map directly to the ADF spec elements — prospects, vehicles, customers, vendors, and providers. The parser is intentionally lenient: it coerces attribute values to their expected types and fills in defaults for optional attributes so that downstream code can work with clean TypeScript objects. Spec-level rule enforcement is a separate step, handled by `ADFvalidate`.
+
+## Function signature
+
+```typescript
+import { ADFparse } from '@uhteddy/adf-kit';
+
+ADFparse(xmlString: string): ADFDocument
+```
+
+## Parameters
+
+<ParamField path="xmlString" type="string" required>
+  A complete ADF 1.0 XML document as a string. The parser accepts the common
+  non-standard forms found in the wild, including the `<?ADF version "1.0"?>`
+  processing instruction and uppercase `<?XML VERSION "1.0"?>` declarations.
+</ParamField>
+
+## Return value
+
+Returns an [`ADFDocument`](/api/types-document) containing a `version` string and a `prospects` array of `ADFProspect` objects. Every prospect includes its request date, vehicles, customer, vendor, and optional provider — all fully typed.
+
+## XML preprocessing
+
+Before parsing, `ADFparse` normalizes two non-standard XML constructs that appear in real-world ADF feeds:
+
+- **ADF processing instruction** — `<?ADF version "1.0"?>` is stripped from the input. The version value is captured and stored on the returned `ADFDocument`.
+- **Uppercase XML declaration** — `<?XML VERSION "1.0"?>` is normalized to the lowercase `<?xml version="1.0"?>` form that the underlying XML parser expects.
+
+The input is also trimmed of leading and trailing whitespace before parsing begins.
+
+## Lenient parsing model
+
+`ADFparse` trusts the raw XML values and coerces them into the expected TypeScript types without throwing:
+
+- **Enums** — unrecognized attribute values (e.g. an unknown `interest` value on `<vehicle>`) fall back to the ADF spec default for that field (`"buy"` for vehicle interest, `"new"` for status, etc.).
+- **Numbers** — text content and attributes that should be numeric are parsed with `parseInt` or `parseFloat`; values that cannot be parsed become `undefined` rather than `NaN`.
+- **ISO 8601 dates** — date strings are accepted as-is and normalized to a consistent format; the validator checks whether they conform to spec patterns.
+- **Currency and country codes** — stored as-is; semantic validation (ISO 4217, ISO 3166-1) is left to `ADFvalidate`.
+
+Use `ADFvalidate` after parsing when you need to enforce spec rules.
+
+## Usage
+
+### Basic parse
+
+```typescript title="basic-parse.ts"
+import { ADFparse } from '@uhteddy/adf-kit';
+
+const doc = ADFparse(xmlString);
+
+const prospect = doc.prospects[0];
+console.log(prospect.vehicles[0].make);          // "Toyota"
+console.log(prospect.customer.contact.emails[0].value); // "jane@example.com"
+console.log(prospect.vendor.vendorName);          // "Sunrise Toyota"
+```
+
+### Parse with error handling
+
+<Warning>
+  Always wrap `ADFparse` in a `try/catch` block. It throws `ADFParseError` for
+  malformed XML and for ADF documents that are missing required structural
+  elements.
+</Warning>
+
+```typescript title="parse-with-catch.ts"
+import { ADFparse, ADFParseError } from '@uhteddy/adf-kit';
+
+let doc;
+try {
+  doc = ADFparse(xmlString);
+} catch (err) {
+  if (err instanceof ADFParseError) {
+    console.error('ADF parse failed:', err.message);
+    // err.cause holds the underlying XML parser error, if any
+  }
+  process.exit(1);
+}
+
+// doc is guaranteed to be a valid ADFDocument here
+console.log(`Parsed ${doc.prospects.length} prospect(s)`);
+```
+
+### Parse + validate pattern
+
+<Note>
+  `ADFparse` is lenient by design. Use `ADFvalidate` immediately after to check
+  for spec violations such as missing vehicle fields, bad VINs, or invalid
+  currency codes.
+</Note>
+
+```typescript title="parse-and-validate.ts"
+import { ADFparse, ADFvalidate, ADFParseError } from '@uhteddy/adf-kit';
+
+let doc;
+try {
+  doc = ADFparse(xmlString);
+} catch (err) {
+  if (err instanceof ADFParseError) {
+    console.error('Malformed ADF XML:', err.message);
+  }
+  process.exit(1);
+}
+
+const result = ADFvalidate(doc);
+if (!result.valid) {
+  for (const issue of result.errors) {
+    console.error(`[${issue.path}] ${issue.message}`);
+  }
+}
+for (const warn of result.warnings) {
+  console.warn(`[${warn.path}] ${warn.message}`);
+}
+```
+
+## Error reference
+
+`ADFparse` throws `ADFParseError` (a subclass of `Error`) in all of the following cases:
+
+<AccordionGroup>
+  <Accordion title="Malformed XML">
+    The underlying XML parser cannot tokenize the input — e.g. unclosed tags,
+    invalid characters, or a completely empty string.
+  </Accordion>
+  <Accordion title="Missing root <adf> element">
+    The document was parsed as valid XML but no `<adf>` root element was found
+    at the top level.
+  </Accordion>
+  <Accordion title="Missing <prospect> inside <adf>">
+    The `<adf>` element exists but contains no `<prospect>` children.
+  </Accordion>
+  <Accordion title="Missing <requestdate> inside a prospect">
+    A `<prospect>` element is present but has no `<requestdate>` child, which
+    is required by the ADF spec.
+  </Accordion>
+  <Accordion title="Missing <vehicle> inside a prospect">
+    A `<prospect>` element contains no `<vehicle>` children. At least one
+    vehicle is required per prospect.
+  </Accordion>
+  <Accordion title="Missing <customer> inside a prospect">
+    A `<prospect>` element is missing its `<customer>` child element.
+  </Accordion>
+  <Accordion title="Missing <vendor> or <contact> inside a prospect">
+    A `<prospect>` element is missing its `<vendor>` child, or the `<vendor>`
+    is present but has no `<contact>` child.
+  </Accordion>
+</AccordionGroup>

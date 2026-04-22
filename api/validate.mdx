@@ -1,0 +1,245 @@
+---
+title: "ADFvalidate — validate a document against ADF 1.0 spec"
+description: "Check an ADFDocument for ADF 1.0 spec violations and advisory issues. Returns a ValidationResult with typed errors and warnings arrays. Never throws."
+---
+
+The `ADFvalidate` function checks a parsed or builder-constructed `ADFDocument` against the ADF 1.0 specification rules. It inspects required fields, numeric range constraints, ISO-format codes, and relational consistency (such as whether a timeframe's `earliestDate` precedes its `latestDate`). Unlike `ADFparse`, this function never throws — it always returns a `ValidationResult` that you inspect to decide how to proceed. Errors represent outright spec violations that would produce an invalid ADF document; warnings are advisory issues that flag likely mistakes without blocking serialization.
+
+## Function signature
+
+```typescript
+import { ADFvalidate } from '@uhteddy/adf-kit';
+
+ADFvalidate(doc: ADFDocument): ValidationResult
+```
+
+## Parameters
+
+<ParamField path="doc" type="ADFDocument" required>
+  A parsed or programmatically constructed `ADFDocument`. Typically the return
+  value of `ADFparse`, or a document built with `buildDocument` or one of the
+  fluent builders.
+</ParamField>
+
+## Return value
+
+<ResponseField name="valid" type="boolean">
+  `true` when there are zero spec-level errors. Warnings do not affect this
+  flag.
+</ResponseField>
+
+<ResponseField name="errors" type="ValidationIssue[]">
+  Spec violations that indicate the document is non-conformant. An empty array
+  when `valid` is `true`.
+
+  <Expandable title="ValidationIssue properties">
+    <ResponseField name="path" type="string">
+      Dot-separated path to the offending field, e.g.
+      `"prospects[0].customer.contact"` or
+      `"prospects[0].vehicles[0].options[2].weighting"`.
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable description of the violation.
+    </ResponseField>
+    <ResponseField name="severity" type="'error' | 'warning'">
+      Always `"error"` for items in the `errors` array.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="warnings" type="ValidationIssue[]">
+  Non-fatal advisory issues. The document can still be serialized and
+  transmitted, but these issues may cause problems at the receiving system.
+
+  <Expandable title="ValidationIssue properties">
+    <ResponseField name="path" type="string">
+      Dot-separated path to the field with the advisory issue.
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable description of the issue.
+    </ResponseField>
+    <ResponseField name="severity" type="'error' | 'warning'">
+      Always `"warning"` for items in the `warnings` array.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Spec errors
+
+The following conditions produce entries in `result.errors` and set `result.valid` to `false`:
+
+<AccordionGroup>
+  <Accordion title="Missing vehicle year, make, or model">
+    The ADF spec requires every `<vehicle>` element to have a `<year>`,
+    `<make>`, and `<model>`. A missing or empty value for any of these three
+    fields is a spec violation.
+  </Accordion>
+  <Accordion title="Contact has no email and no phone">
+    Every `<contact>` element — whether on a customer or vendor — must have at
+    least one non-empty `<email>` or `<phone>` value. A contact with neither is
+    a spec error.
+  </Accordion>
+  <Accordion title="Address exceeds 5 street lines">
+    The ADF DTD allows a maximum of 5 `<street>` child elements within an
+    `<address>`. More than 5 is a spec violation.
+  </Accordion>
+  <Accordion title="Option weighting outside −100 to +100">
+    The `<weighting>` element inside an `<option>` must be an integer between
+    −100 and +100 inclusive. Values outside this range are a spec error.
+  </Accordion>
+  <Accordion title="Missing <id> source attribute">
+    The ADF spec requires every `<id>` element to carry a `source` attribute
+    identifying the system that issued the identifier. An `<id>` with no
+    `source` is a spec violation.
+  </Accordion>
+  <Accordion title="Empty <id> value">
+    An `<id>` element that is present but contains only whitespace (or is
+    completely empty) is a spec error.
+  </Accordion>
+  <Accordion title="ADF document has no prospects">
+    A valid ADF document must contain at least one `<prospect>`. An empty
+    `prospects` array is a spec violation.
+  </Accordion>
+</AccordionGroup>
+
+## Warnings
+
+The following conditions produce entries in `result.warnings` but do not affect `result.valid`:
+
+<AccordionGroup>
+  <Accordion title="Invalid VIN format">
+    VINs must be exactly 17 characters and match the pattern
+    `[A-HJ-NPR-Z0-9]` (I, O, and Q are not valid VIN characters). A VIN that
+    fails this check is flagged as a warning.
+  </Accordion>
+  <Accordion title="Vehicle year outside 1886–2100">
+    A vehicle year before 1886 (the year of the first automobile) or after 2100
+    is flagged as likely erroneous.
+  </Accordion>
+  <Accordion title="Malformed email address">
+    Email values are checked against the pattern `[^@\s]+@[^@\s]+\.[^@\s]+`.
+    Values that do not match are flagged; the check is advisory and not
+    RFC 5321-strict.
+  </Accordion>
+  <Accordion title="Invalid ISO 4217 currency code">
+    Currency codes on `<price>`, `<amount>`, and `<balance>` elements are
+    checked against the ISO 4217 standard. Unrecognized codes are flagged.
+  </Accordion>
+  <Accordion title="Invalid ISO 3166-1 country code">
+    Country values inside `<address>` elements are checked against ISO 3166-1
+    alpha-2. Unrecognized codes are flagged.
+  </Accordion>
+  <Accordion title="Malformed ISO 8601 date">
+    Date strings on `<requestdate>`, `<earliestdate>`, and `<latestdate>` that
+    do not match an ISO 8601 pattern are flagged.
+  </Accordion>
+  <Accordion title="earliestDate is after latestDate">
+    When a customer `<timeframe>` specifies both `<earliestdate>` and
+    `<latestdate>`, the earliest must not be later than the latest.
+  </Accordion>
+  <Accordion title="Negative odometer or finance amounts">
+    Odometer readings, finance `<amount>` values, and `<balance>` values that
+    are negative are flagged as likely data errors.
+  </Accordion>
+  <Accordion title="Missing or empty &lt;id&gt; source attribute">
+    The ADF spec requires every `<id>` element to carry a `source` attribute
+    identifying the system that issued the identifier. An `<id>` with no
+    `source` is a spec error. An `<id>` with an empty value is also a spec error.
+  </Accordion>
+  <Accordion title="ADF document has no prospects">
+    A valid ADF document must contain at least one `<prospect>`. An empty
+    `prospects` array is a spec violation.
+  </Accordion>
+</AccordionGroup>
+
+## Warnings
+
+The following conditions produce entries in `result.warnings` but do not affect `result.valid`:
+
+<AccordionGroup>
+  <Accordion title="Invalid VIN format">
+    VINs must be exactly 17 characters and match the pattern
+    `[A-HJ-NPR-Z0-9]` (I, O, and Q are not valid VIN characters). A VIN that
+    fails this check is flagged as a warning.
+  </Accordion>
+  <Accordion title="Vehicle year outside 1886–2100">
+    A vehicle year before 1886 (the year of the first automobile) or after 2100
+    is flagged as likely erroneous.
+  </Accordion>
+  <Accordion title="Malformed email address">
+    Email values are checked against the pattern `[^@\s]+@[^@\s]+\.[^@\s]+`.
+    Values that do not match are flagged; the check is advisory and not
+    RFC 5321-strict.
+  </Accordion>
+  <Accordion title="Invalid ISO 4217 currency code">
+    Currency codes on `<price>`, `<amount>`, and `<balance>` elements are
+    checked against the ISO 4217 standard. Unrecognized codes are flagged.
+  </Accordion>
+  <Accordion title="Invalid ISO 3166-1 country code">
+    Country values inside `<address>` elements are checked against ISO 3166-1
+    alpha-2. Unrecognized codes are flagged.
+  </Accordion>
+  <Accordion title="Malformed ISO 8601 date">
+    Date strings on `<requestdate>`, `<earliestdate>`, and `<latestdate>` that
+    do not match an ISO 8601 pattern are flagged.
+  </Accordion>
+  <Accordion title="earliestDate is after latestDate">
+    When a customer `<timeframe>` specifies both `<earliestdate>` and
+    `<latestdate>`, the earliest must not be later than the latest.
+  </Accordion>
+  <Accordion title="Negative odometer or finance amounts">
+    Odometer readings, finance `<amount>` values, and `<balance>` values that
+    are negative are flagged as likely data errors.
+  </Accordion>
+</AccordionGroup>
+
+## Usage
+
+<Note>
+  `ADFvalidate` never throws. It is always safe to call without a `try/catch`.
+  Inspect `result.valid` and `result.errors` to determine whether the document
+  conforms to the spec.
+</Note>
+
+```typescript title="validate.ts"
+import { ADFparse, ADFvalidate } from '@uhteddy/adf-kit';
+
+const doc = ADFparse(xmlString);
+const result = ADFvalidate(doc);
+
+if (!result.valid) {
+  console.error(`Found ${result.errors.length} spec violation(s):`);
+  for (const issue of result.errors) {
+    console.error(`  [${issue.path}] ${issue.message}`);
+  }
+}
+
+if (result.warnings.length > 0) {
+  console.warn(`Found ${result.warnings.length} advisory warning(s):`);
+  for (const warn of result.warnings) {
+    console.warn(`  [${warn.path}] ${warn.message}`);
+  }
+}
+
+if (result.valid) {
+  console.log('Document is ADF 1.0 compliant.');
+}
+```
+
+### Validate a builder-constructed document
+
+```typescript title="validate-builder.ts"
+import { ADFvalidate, buildDocument } from '@uhteddy/adf-kit';
+
+const doc = buildDocument({
+  prospects: [{
+    vehicle: { year: 2025, make: 'Toyota', model: 'Camry' },
+    customer: { firstName: 'Jane', email: 'jane@example.com' },
+    vendor: { name: 'Sunrise Toyota', email: 'leads@sunrise.com' },
+  }],
+});
+
+const result = ADFvalidate(doc);
+console.log(result.valid);   // true
+console.log(result.errors);  // []
+```

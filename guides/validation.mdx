@@ -1,0 +1,176 @@
+---
+title: "Validating ADF documents against the spec"
+description: "Use ADFvalidate to check parsed or built ADF documents for spec violations and advisory warnings without throwing — inspect the structured result."
+---
+
+adf-kit separates parsing from validation deliberately. `ADFparse` accepts any structurally complete ADF XML document and coerces values into typed objects without raising errors for semantic issues. `ADFvalidate` is where spec compliance is enforced: it checks required fields, value ranges, format constraints, and cross-field rules, then returns a structured result object rather than throwing. This page explains the result shape, what qualifies as an error versus a warning, and how to integrate validation into your lead-processing pipeline.
+
+<Note>
+  `ADFvalidate` never throws. No matter how many issues are found, it always returns a `ValidationResult` object. Inspect `result.valid` to determine whether the document passed.
+</Note>
+
+## The ValidationResult interface
+
+`ADFvalidate(doc)` returns a `ValidationResult` with three fields:
+
+<ResponseField name="valid" type="boolean" required>
+  `true` when no errors were found. Warnings do not affect this flag — a document can have warnings and still be `valid: true`.
+</ResponseField>
+
+<ResponseField name="errors" type="ValidationIssue[]" required>
+  Spec violations that mean the document does not conform to ADF 1.0. An empty array when the document is valid.
+
+  <Expandable title="ValidationIssue properties">
+    <ResponseField name="path" type="string">
+      Dot-separated path to the offending field, e.g. `"prospects[0].customer.contact"`. Use this to pinpoint the problem in your data.
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable description of the issue.
+    </ResponseField>
+    <ResponseField name="severity" type="'error' | 'warning'">
+      Always `'error'` for items in the `errors` array.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="warnings" type="ValidationIssue[]" required>
+  Advisory findings that do not block the document from being used but may indicate data quality problems. An empty array when no warnings were found.
+
+  <Expandable title="ValidationIssue properties">
+    <ResponseField name="path" type="string">
+      Dot-separated path to the flagged field.
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable description of the advisory.
+    </ResponseField>
+    <ResponseField name="severity" type="'error' | 'warning'">
+      Always `'warning'` for items in the `warnings` array.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## What counts as an error
+
+Errors are hard spec violations. A document with any errors should not be forwarded to a dealer system without correction.
+
+<AccordionGroup>
+  <Accordion title="Missing required fields">
+    Every prospect must have at least one vehicle with a non-empty `make` and `model`. The vehicle `year` must be present. The customer and vendor contacts must each include at least one `<name>`. The vendor must have a non-empty `vendorName`. The prospect must have a `requestDate`.
+
+    Paths follow the pattern `prospects[0].vehicles[0]`, `prospects[0].customer.contact`, and so on.
+  </Accordion>
+
+  <Accordion title="Contact has no email and no phone">
+    Both customer and vendor contacts must supply at least one email address or at least one phone number. A contact with neither fails validation. The error is reported at the contact path, e.g. `prospects[0].customer.contact`.
+  </Accordion>
+
+  <Accordion title="Address exceeds 5 street lines">
+    The ADF 1.0 DTD permits a maximum of 5 `<street>` lines per address. Providing more than 5 is a spec violation and produces an error at `prospects[0].customer.contact.address`.
+  </Accordion>
+
+  <Accordion title="Option weighting out of range">
+    Vehicle option weighting must be an integer between −100 and +100 inclusive. A value outside this range is an error at `prospects[0].vehicles[0].options[N].weighting`.
+  </Accordion>
+
+  <Accordion title="Missing or empty <id> source attribute">
+    The ADF spec requires the `source` attribute on every `<id>` element. An `<id>` missing a source, or an `<id>` with an empty value, is a spec violation — not just a warning.
+  </Accordion>
+
+  <Accordion title="Document has no prospects">
+    A valid ADF document must contain at least one `<prospect>`. An empty `prospects` array is a spec error.
+  </Accordion>
+</AccordionGroup>
+
+## What counts as a warning
+
+Warnings are non-fatal advisory issues. The document is still usable, but the flagged data may cause problems downstream.
+
+<AccordionGroup>
+  <Accordion title="Invalid VIN format">
+    The VIN must be exactly 17 alphanumeric characters and must not contain the letters I, O, or Q. A VIN that does not match this pattern produces a warning at `prospects[0].vehicles[0].vin`.
+  </Accordion>
+
+  <Accordion title="Vehicle year outside 1886–2100">
+    A model year before 1886 (the year the first automobile was produced) or after 2100 is flagged as likely erroneous. The warning is on the vehicle path.
+  </Accordion>
+
+  <Accordion title="Malformed email address">
+    Any email value that does not contain an `@` sign with non-empty local and domain parts is warned about at `prospects[0].customer.contact.emails[N]`.
+  </Accordion>
+
+  <Accordion title="Invalid ISO 4217 currency code">
+    Currency codes on `<price>`, `<amount>`, and `<balance>` elements are checked against the ISO 4217 standard. An unrecognised code produces a warning.
+  </Accordion>
+
+  <Accordion title="Invalid ISO 3166-1 alpha-2 country code">
+    The `<country>` element inside an address is checked against the ISO 3166-1 alpha-2 list. An unrecognised code is flagged at `prospects[0].customer.contact.address.country`.
+  </Accordion>
+
+  <Accordion title="Malformed ISO 8601 date">
+    `earliestDate` and `latestDate` in the customer's timeframe, and `requestDate` on the prospect, must conform to one of the ISO 8601 formats required by the ADF spec. Dates that do not parse produce a warning.
+  </Accordion>
+
+  <Accordion title="earliestDate after latestDate">
+    If both dates are present and `earliestDate` is later than `latestDate`, the range is logically impossible. The warning is reported at `prospects[0].customer.timeFrame`.
+  </Accordion>
+
+  <Accordion title="Negative odometer or finance amounts">
+    Odometer values and finance amounts (down payment, monthly payment, total, residual balance) must not be negative. Negative values are flagged at the relevant field path.
+  </Accordion>
+</AccordionGroup>
+
+## Full validate and handle example
+
+```typescript
+import { ADFvalidate } from '@uhteddy/adf-kit';
+
+const result = ADFvalidate(doc);
+
+if (!result.valid) {
+  for (const issue of result.errors) {
+    console.error(`[ERROR] [${issue.path}] ${issue.message}`);
+  }
+}
+
+for (const warn of result.warnings) {
+  console.warn(`[WARN]  [${warn.path}] ${warn.message}`);
+}
+
+if (result.valid) {
+  console.log('Document passed ADF 1.0 validation.');
+}
+```
+
+## Parse and validate together
+
+The typical production pattern is to parse first (catching structural errors) and then validate (checking semantic compliance) before acting on the lead.
+
+```typescript
+import { ADFparse, ADFvalidate, ADFParseError } from '@uhteddy/adf-kit';
+
+let doc;
+try {
+  doc = ADFparse(xmlString);
+} catch (err) {
+  if (err instanceof ADFParseError) {
+    console.error('Could not parse ADF:', err.message);
+    process.exit(1);
+  }
+  throw err;
+}
+
+const result = ADFvalidate(doc);
+
+if (!result.valid) {
+  for (const issue of result.errors) {
+    console.error(`[${issue.path}] ${issue.message}`);
+  }
+  // Decide whether to reject the lead or attempt remediation
+}
+
+for (const warn of result.warnings) {
+  console.warn(`[${warn.path}] ${warn.message}`);
+}
+```
+
+Keeping parse and validate as separate steps lets you make different decisions for each failure mode: a parse failure means the XML is unusable and should be rejected immediately, while a validation warning might only warrant a log entry before the lead is forwarded.

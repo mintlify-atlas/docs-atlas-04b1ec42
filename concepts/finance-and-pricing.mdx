@@ -1,0 +1,271 @@
+---
+title: "Finance and pricing in ADF documents"
+description: "How adf-kit models vehicle pricing and financing: ADFPrice, PriceType, ADFFinance, ADFAmount, ADFBalance, and ISO 4217 currency codes with code examples."
+---
+
+Automotive leads frequently include pricing and financing information — the buyer's budget, preferred payment method, down payment ceiling, or trade-in balance. In adf-kit, two types handle this: `ADFPrice` captures the price of a vehicle or option, and `ADFFinance` captures how the buyer intends to pay. This page explains every field on both types, the enumeration values they accept, and how to use them with the `FinanceInput` shorthand in the builder API.
+
+## ADFPrice
+
+`ADFPrice` represents a monetary value attached to a vehicle or an option. It appears on `ADFVehicle.price`, `ADFVehicle.priceComments` (free-text companion), and `ADFOption.price`.
+
+<ResponseField name="value" type="number" required>
+  The numeric price amount. For relative prices (when `delta` is set), this is the magnitude of the delta, not the absolute price.
+</ResponseField>
+
+<ResponseField name="type" type="PriceType" required>
+  The category of price. See the [PriceType values](#pricetype-values) table below.
+</ResponseField>
+
+<ResponseField name="currency" type="CurrencyCode">
+  ISO 4217 three-letter currency code, e.g. `"USD"`, `"CAD"`, `"EUR"`. `ADFvalidate` warns when the code is not recognized by the ISO 4217 standard. When omitted, USD is assumed in practice.
+</ResponseField>
+
+<ResponseField name="delta" type="'absolute' | 'relative' | 'percentage'">
+  Makes this price relative to another reference price (set via `relativeTo`). When set, `value` expresses the difference rather than the final price:
+  - `'absolute'` — `value` is a fixed dollar offset, e.g. `500` above invoice
+  - `'relative'` — `value` is a multiplier relative to the reference
+  - `'percentage'` — `value` is a percentage point difference, e.g. `2` means 2% above invoice
+</ResponseField>
+
+<ResponseField name="relativeTo" type="'msrp' | 'invoice'">
+  The reference price that `delta` is applied to. Only meaningful when `delta` is set.
+</ResponseField>
+
+<ResponseField name="source" type="string">
+  Attribution for the price data, e.g. `"Kelley Blue Book"` or `"NADA"`.
+</ResponseField>
+
+### PriceType values
+
+| Value | Meaning |
+|---|---|
+| `'quote'` | A price quoted by the seller. Default when using `VehicleInput` with a plain number. |
+| `'offer'` | A price offered by the buyer. |
+| `'msrp'` | Manufacturer's suggested retail price. |
+| `'invoice'` | Dealer invoice price. |
+| `'call'` | Price is available on request ("call for price"). |
+| `'appraisal'` | An appraised value, typically for a trade-in. |
+| `'asking'` | Seller's asking price for a used vehicle. |
+
+---
+
+## ADFFinance
+
+`ADFFinance` lives on `ADFVehicle.finance` and describes how the buyer intends to finance the purchase. It requires a payment method and at least one `ADFAmount` entry.
+
+<ResponseField name="method" type="FinanceMethod" required>
+  The financing method. The ADF spec lists `'cash'`, `'finance'`, and `'lease'` as canonical values, but the type is free-text (`FinanceMethod = 'cash' | 'finance' | 'lease' | string`) to accommodate custom values. `ADFvalidate` errors when `method` is missing.
+</ResponseField>
+
+<ResponseField name="amounts" type="ADFAmount[]" required>
+  One or more payment amount constraints. At least one is required. See [ADFAmount](#adfamount) below. `ADFvalidate` errors when the array is empty.
+</ResponseField>
+
+<ResponseField name="balance" type="ADFBalance">
+  An outstanding balance on a trade-in or existing lease. See [ADFBalance](#adfbalance) below.
+</ResponseField>
+
+---
+
+## ADFAmount
+
+Each entry in `ADFFinance.amounts` is an `ADFAmount` that describes a single payment constraint — a down payment ceiling, a monthly payment cap, or a total budget.
+
+<ResponseField name="value" type="number" required>
+  The numeric amount. `ADFvalidate` warns on negative values.
+</ResponseField>
+
+<ResponseField name="type" type="'downpayment' | 'monthly' | 'total'" required>
+  What this amount represents:
+  - `'downpayment'` — the initial lump-sum payment
+  - `'monthly'` — the recurring monthly payment
+  - `'total'` — the total amount paid over the life of the loan or lease
+</ResponseField>
+
+<ResponseField name="limit" type="'maximum' | 'minimum' | 'exact'" required>
+  Whether this amount is a cap, a floor, or a precise target:
+  - `'maximum'` — the buyer will pay at most this amount
+  - `'minimum'` — the buyer will pay at least this amount (less common)
+  - `'exact'` — the buyer expects exactly this amount
+</ResponseField>
+
+<ResponseField name="currency" type="CurrencyCode">
+  ISO 4217 currency code for this amount. `ADFvalidate` warns on unrecognized codes.
+</ResponseField>
+
+---
+
+## ADFBalance
+
+`ADFBalance` represents an outstanding balance that affects the deal — the residual value at the end of a lease or the payoff amount on a trade-in.
+
+<ResponseField name="value" type="number" required>
+  The balance amount. `ADFvalidate` warns on negative values.
+</ResponseField>
+
+<ResponseField name="type" type="'finance' | 'residual'" required>
+  - `'finance'` — a remaining loan balance on the trade-in vehicle
+  - `'residual'` — the residual value at the end of a lease term
+</ResponseField>
+
+<ResponseField name="currency" type="CurrencyCode">
+  ISO 4217 currency code. `ADFvalidate` warns on unrecognized codes.
+</ResponseField>
+
+---
+
+## FinanceInput — simplified input
+
+When using `ADFProspectBuilder` or `generateProspect`, pass a `FinanceInput` object on `VehicleInput.finance`. The generator converts it to a fully-typed `ADFFinance` internally.
+
+<ResponseField name="method" type="FinanceMethod">
+  The financing method. Defaults to `'finance'` when omitted.
+</ResponseField>
+
+<ResponseField name="downPayment" type="number">
+  Down payment amount. Becomes an `ADFAmount` with `type: 'downpayment'` and `limit: 'exact'`.
+</ResponseField>
+
+<ResponseField name="monthlyPayment" type="number">
+  Monthly payment amount. Becomes an `ADFAmount` with `type: 'monthly'` and `limit: 'exact'`.
+</ResponseField>
+
+<ResponseField name="totalAmount" type="number">
+  Total deal amount. Becomes an `ADFAmount` with `type: 'total'` and `limit: 'exact'`.
+</ResponseField>
+
+<ResponseField name="currency" type="CurrencyCode">
+  Applied to all generated `ADFAmount` entries and the `ADFBalance` (if set).
+</ResponseField>
+
+<ResponseField name="residualBalance" type="number">
+  Outstanding balance on a trade-in or lease. Becomes an `ADFBalance` with `type: 'residual'`.
+</ResponseField>
+
+<Note>
+  When using `FinanceInput`, the `limit` on generated amounts is always `'exact'`. If you need `'maximum'` or `'minimum'` limits, construct `ADFFinance` directly and pass it via `buildProspect` or `buildDocument`.
+</Note>
+
+---
+
+## Financing scenarios
+
+<Tabs>
+  <Tab title="Cash">
+    A buyer who plans to pay cash typically has no monthly payment or financing terms. Use `method: 'cash'` and, if needed, a total amount reflecting their budget.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2024,
+        make: 'Toyota',
+        model: 'Corolla',
+        interest: 'buy',
+        status: 'new',
+        finance: {
+          method: 'cash',
+          totalAmount: 25_000,
+          currency: 'USD',
+        },
+      })
+      .customer({ firstName: 'Sam', email: 'sam@example.com' })
+      .vendor({ name: 'City Toyota', email: 'leads@citytoyota.com' })
+      .string();
+    ```
+  </Tab>
+  <Tab title="Finance">
+    A financed purchase requires a down payment and a monthly payment constraint. The buyer signals the maximum they can afford each month.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2024,
+        make: 'Honda',
+        model: 'Accord',
+        interest: 'buy',
+        status: 'new',
+        finance: {
+          method: 'finance',
+          downPayment: 5_000,
+          monthlyPayment: 400,
+          currency: 'USD',
+        },
+      })
+      .customer({ firstName: 'Carlos', email: 'carlos@example.com' })
+      .vendor({ name: 'Metro Honda', email: 'leads@metrohonda.com' })
+      .string();
+    ```
+
+    If you need to express a trade-in payoff balance (e.g. the buyer owes $8,000 on their current vehicle), add `residualBalance`:
+
+    ```typescript
+    finance: {
+      method: 'finance',
+      downPayment: 5_000,
+      monthlyPayment: 450,
+      residualBalance: 8_000,
+      currency: 'USD',
+    }
+    ```
+  </Tab>
+  <Tab title="Lease">
+    A lease lead captures the monthly payment ceiling and down payment maximum. Set `method: 'lease'` to signal leasing intent.
+
+    ```typescript
+    import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+    const xml = new ADFProspectBuilder()
+      .vehicle({
+        year: 2025,
+        make: 'BMW',
+        model: '3 Series',
+        trim: '330i',
+        interest: 'lease',
+        status: 'new',
+        finance: {
+          method: 'lease',
+          monthlyPayment: 550,
+          downPayment: 3_000,
+          currency: 'USD',
+        },
+      })
+      .customer({
+        firstName: 'Priya',
+        lastName: 'Patel',
+        email: 'priya@example.com',
+        timeFrame: 'Within 2 weeks',
+      })
+      .vendor({ name: 'Downtown BMW', email: 'leads@downtownbmw.com' })
+      .string();
+    ```
+
+    For a lease with a specified residual value, add `residualBalance` — it maps to an `ADFBalance` with `type: 'residual'`:
+
+    ```typescript
+    finance: {
+      method: 'lease',
+      monthlyPayment: 550,
+      downPayment: 3_000,
+      residualBalance: 18_000,
+      currency: 'USD',
+    }
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Currency codes
+
+All currency fields on `ADFPrice`, `ADFAmount`, and `ADFBalance` accept the `CurrencyCode` type, which is the union of valid ISO 4217 three-letter codes (e.g. `"USD"`, `"CAD"`, `"EUR"`, `"GBP"`). The type is re-exported from adf-kit:
+
+```typescript
+import type { CurrencyCode } from '@uhteddy/adf-kit';
+```
+
+`ADFvalidate` checks currency values against the ISO 4217 standard and emits a **warning** (not an error) when a code is unrecognized. The document remains valid from a spec standpoint; the warning is advisory.

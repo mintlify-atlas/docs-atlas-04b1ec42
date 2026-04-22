@@ -1,0 +1,249 @@
+---
+title: "generateProspect and generateADF — one-shot ADF factories"
+description: "One-shot functions for creating ADF XML from plain objects: generateProspect, generateADF, buildProspect, and buildDocument with full ProspectInput reference."
+---
+
+adf-kit provides four one-shot functions for generating ADF leads programmatically. `generateProspect` and `generateADF` are the simplest path from plain JavaScript objects to ADF XML: call them with an input object and receive a ready-to-send XML string. `buildProspect` and `buildDocument` stop before serialization, returning fully-typed `ADFProspect` and `ADFDocument` objects — useful when you need to inspect, validate, or further modify the document before converting it to XML. All four functions accept the same simplified input types; the fluent `ADFProspectBuilder` is the recommended alternative when leads are constructed interactively or require complex option configuration.
+
+## One-shot XML generators
+
+<Tabs>
+  <Tab title="generateProspect">
+    ### `generateProspect`
+
+    Converts a single `ProspectInput` object into a complete ADF 1.0 XML string in one call. The returned XML wraps the prospect in a standard `<adf>` document.
+
+    ```typescript
+    generateProspect(input: ProspectInput): string
+    ```
+
+    <ParamField path="input" type="ProspectInput" required>
+      A plain object describing the lead. See [ProspectInput](#prospectinput) below.
+    </ParamField>
+
+    **Returns:** `string` — a complete ADF 1.0 XML document.
+
+    ```typescript title="generate-prospect.ts"
+    import { generateProspect } from '@uhteddy/adf-kit';
+
+    const xml = generateProspect({
+      vehicle: { year: 2025, make: 'Toyota', model: 'Camry', interest: 'buy' },
+      customer: {
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane.smith@example.com',
+        phone: '555-867-5309',
+      },
+      vendor: { name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' },
+    });
+
+    await fetch('https://crm.example.com/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/xml' },
+      body: xml,
+    });
+    ```
+  </Tab>
+  <Tab title="generateADF">
+    ### `generateADF`
+
+    Converts an `ADFInput` object — which holds one or more prospects — into a complete ADF 1.0 XML string. Use this when a single submission should carry multiple leads (for example, a customer interested in several vehicles at different dealerships).
+
+    ```typescript
+    generateADF(input: ADFInput): string
+    ```
+
+    <ParamField path="input" type="ADFInput" required>
+      A plain object with a `prospects` field and an optional `version`. See [ADFInput](#adfinput) below.
+    </ParamField>
+
+    **Returns:** `string` — a complete ADF 1.0 XML document.
+
+    ```typescript title="generate-adf.ts"
+    import { generateADF } from '@uhteddy/adf-kit';
+
+    const xml = generateADF({
+      prospects: [
+        {
+          vehicle: { year: 2025, make: 'Honda', model: 'CR-V' },
+          customer: { firstName: 'Alex', email: 'alex@example.com' },
+          vendor: { name: 'Metro Honda', email: 'internet@metrohonda.com' },
+        },
+        {
+          vehicle: { year: 2025, make: 'Toyota', model: 'RAV4' },
+          customer: { firstName: 'Alex', email: 'alex@example.com' },
+          vendor: { name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' },
+        },
+      ],
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Typed document builders
+
+### `buildProspect`
+
+Converts a `ProspectInput` into a fully-typed `ADFProspect` without serializing it to XML. Use when you need to inspect or validate the object before serialization, or when you are assembling an `ADFDocument` manually.
+
+```typescript
+buildProspect(input: ProspectInput): ADFProspect
+```
+
+<ParamField path="input" type="ProspectInput" required>
+  A plain object describing the lead. See [ProspectInput](#prospectinput) below.
+</ParamField>
+
+**Returns:** `ADFProspect` — a fully-typed prospect object ready for validation or serialization.
+
+```typescript title="build-prospect.ts"
+import { buildProspect, ADFvalidate, ADFserialize } from '@uhteddy/adf-kit';
+
+const prospect = buildProspect({
+  vehicle: { year: 2024, make: 'Ford', model: 'F-150', vin: '1FTFW1E80MFA00001' },
+  customer: { firstName: 'Carlos', email: 'carlos@example.com' },
+  vendor: { name: 'Capital City Ford', email: 'internet@capitalcityford.com' },
+});
+
+// Inspect or validate before serializing
+const doc = { version: '1.0', prospects: [prospect] };
+const result = ADFvalidate(doc);
+if (result.valid) {
+  const xml = ADFserialize(doc);
+}
+```
+
+### `buildDocument`
+
+Converts an `ADFInput` into a fully-typed `ADFDocument` without serializing it to XML.
+
+```typescript
+buildDocument(input: ADFInput): ADFDocument
+```
+
+<ParamField path="input" type="ADFInput" required>
+  A plain object with a `prospects` field and an optional `version`. See [ADFInput](#adfinput) below.
+</ParamField>
+
+**Returns:** `ADFDocument` — a fully-typed document object ready for validation or serialization.
+
+```typescript title="build-document.ts"
+import { buildDocument, ADFvalidate, ADFserialize } from '@uhteddy/adf-kit';
+
+const doc = buildDocument({
+  prospects: [{
+    vehicle: { year: 2025, make: 'BMW', model: '3 Series', interest: 'lease' },
+    customer: { firstName: 'Priya', email: 'priya@example.com', timeFrame: 'Within 2 weeks' },
+    vendor: { name: 'Downtown BMW', email: 'leads@downtownbmw.com' },
+  }],
+});
+
+const result = ADFvalidate(doc);
+if (result.valid) {
+  const xml = ADFserialize(doc);
+}
+```
+
+## Input type reference
+
+### ProspectInput
+
+The input shape accepted by `generateProspect` and `buildProspect`.
+
+<ResponseField name="vehicle" type="VehicleInput | VehicleInput[]" required>
+  One or more vehicles the customer is interested in. Pass an array when the
+  customer is considering multiple vehicles in a single prospect.
+</ResponseField>
+
+<ResponseField name="customer" type="CustomerInput" required>
+  Contact details and purchase preferences for the prospective buyer.
+
+  <Expandable title="CustomerInput properties">
+    <ResponseField name="firstName" type="string">First name.</ResponseField>
+    <ResponseField name="lastName" type="string">Last name.</ResponseField>
+    <ResponseField name="fullName" type="string">
+      Used when first/last are not available separately.
+    </ResponseField>
+    <ResponseField name="email" type="string | string[]">One or more email addresses.</ResponseField>
+    <ResponseField name="phone" type="string | PhoneInput | Array<string | PhoneInput>">
+      One or more phone numbers. Pass a plain string for a voice number, or a
+      `PhoneInput` object to specify type and preferred call time.
+    </ResponseField>
+    <ResponseField name="address" type="AddressInput">Mailing or home address.</ResponseField>
+    <ResponseField name="timeFrame" type="string | { description?: string; earliest?: string | Date; latest?: string | Date }">
+      Purchase timeframe. Pass a plain string for a description, or an object
+      to supply structured earliest/latest dates.
+    </ResponseField>
+    <ResponseField name="comments" type="string">Free-text notes about the customer.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="vendor" type="VendorInput" required>
+  The dealership or selling entity this lead is addressed to.
+
+  <Expandable title="VendorInput properties">
+    <ResponseField name="name" type="string" required>Dealership or entity name.</ResponseField>
+    <ResponseField name="url" type="string">Dealership website URL.</ResponseField>
+    <ResponseField name="contactName" type="string">Name of the primary contact at the dealership.</ResponseField>
+    <ResponseField name="email" type="string">Contact email address.</ResponseField>
+    <ResponseField name="phone" type="string">Contact phone number.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="provider" type="ProviderInput">
+  The lead source or aggregator that originated the lead.
+
+  <Expandable title="ProviderInput properties">
+    <ResponseField name="name" type="string" required>Name of the lead source or service.</ResponseField>
+    <ResponseField name="service" type="string">Specific service within the provider, e.g. `"New Car Search"`.</ResponseField>
+    <ResponseField name="url" type="string">Provider website URL.</ResponseField>
+    <ResponseField name="email" type="string">Provider contact email.</ResponseField>
+    <ResponseField name="phone" type="string">Provider contact phone.</ResponseField>
+    <ResponseField name="contact" type="ContactInput">Optional named contact at the provider.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="requestDate" type="Date | string">
+  Timestamp when the lead was created. Defaults to the current time when
+  omitted.
+</ResponseField>
+
+<ResponseField name="status" type="'new' | 'resend'">
+  Lead status. Defaults to `"new"`.
+</ResponseField>
+
+### ADFInput
+
+The input shape accepted by `generateADF` and `buildDocument`.
+
+<ResponseField name="prospects" type="ProspectInput | ProspectInput[]" required>
+  One or more prospects to include in the ADF document.
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  ADF spec version string. Defaults to `"1.0"`.
+</ResponseField>
+
+## Choosing between the generator functions and the builder
+
+<Note>
+  Prefer the `ADFProspectBuilder` fluent API for interactive or complex leads
+  — it provides TypeScript type safety that prevents calling terminal methods
+  (`.string()`, `.xml()`) before required fields (`vehicle`, `customer`,
+  `vendor`) have been set. Use `generateProspect` and `generateADF` for
+  scripting, batch processing, or any context where you are constructing the
+  input object from a data source and converting it to XML in a single step.
+</Note>
+
+```typescript title="batch-processing.ts"
+import { generateProspect } from '@uhteddy/adf-kit';
+
+// Process an array of leads from a database or API
+const xmlDocuments = leadsFromDatabase.map((lead) =>
+  generateProspect({
+    vehicle: { year: lead.vehicleYear, make: lead.vehicleMake, model: lead.vehicleModel },
+    customer: { firstName: lead.firstName, email: lead.email },
+    vendor: { name: lead.dealerName, email: lead.dealerEmail },
+  })
+);
+```

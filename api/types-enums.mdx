@@ -1,0 +1,317 @@
+---
+title: "ADF enum types and literal unions"
+description: "All TypeScript literal union types in adf-kit: prospect status, vehicle interest, price type, finance method, name part, phone type, and address type."
+---
+
+adf-kit represents all ADF categorical values as TypeScript string literal union types — no runtime enums, just narrow string types that the compiler enforces. This page documents every such type exported from the library, organized by the part of an ADF document where each is used.
+
+---
+
+## Prospect types
+
+### ProspectStatus
+
+Indicates whether a lead is being submitted for the first time or is a resubmission.
+
+```typescript
+type ProspectStatus = 'new' | 'resend';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"new"` | First-time submission of this lead. |
+| `"resend"` | Resubmission of a previously sent lead (e.g. after a delivery failure). |
+
+---
+
+## Vehicle types
+
+### VehicleInterest
+
+What the customer intends to do with the vehicle in this lead.
+
+```typescript
+type VehicleInterest =
+  | 'buy'
+  | 'lease'
+  | 'sell'
+  | 'trade-in'
+  | 'test-drive';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"buy"` | Customer wants to purchase the vehicle outright. |
+| `"lease"` | Customer wants to enter a lease agreement. |
+| `"sell"` | Customer wants to sell their vehicle to the dealer. |
+| `"trade-in"` | Customer wants to trade in a vehicle as part of a purchase. |
+| `"test-drive"` | Customer wants to schedule a test drive only. |
+
+### VehicleStatus
+
+Whether the vehicle is new or used.
+
+```typescript
+type VehicleStatus = 'new' | 'used';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"new"` | Factory-new vehicle with no previous owners. |
+| `"used"` | Pre-owned vehicle. |
+
+### VehicleCondition
+
+Physical condition of a vehicle, typically relevant for used-vehicle leads.
+
+```typescript
+type VehicleCondition =
+  | 'excellent'
+  | 'good'
+  | 'fair'
+  | 'poor'
+  | 'unknown';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"excellent"` | Vehicle is in exceptional condition. |
+| `"good"` | Vehicle is in above-average condition with minor wear. |
+| `"fair"` | Vehicle shows normal wear consistent with its age. |
+| `"poor"` | Vehicle has significant wear, damage, or mechanical issues. |
+| `"unknown"` | Condition has not been assessed. |
+
+---
+
+## Odometer types
+
+### OdometerStatus
+
+Reliability of an odometer reading.
+
+```typescript
+type OdometerStatus =
+  | 'unknown'
+  | 'rolledover'
+  | 'replaced'
+  | 'original';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"unknown"` | Odometer status is not known. |
+| `"rolledover"` | Odometer has exceeded its maximum value and rolled over. |
+| `"replaced"` | Odometer was replaced; reading may not reflect actual mileage. |
+| `"original"` | Odometer is original and has not been altered. |
+
+### OdometerUnits
+
+Unit of measurement for an odometer reading.
+
+```typescript
+type OdometerUnits = 'km' | 'mi';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"km"` | Kilometers. |
+| `"mi"` | Miles. |
+
+---
+
+## Price types
+
+### PriceType
+
+How the price value should be interpreted within the context of a transaction.
+
+```typescript
+type PriceType =
+  | 'quote'
+  | 'offer'
+  | 'msrp'
+  | 'invoice'
+  | 'call'
+  | 'appraisal'
+  | 'asking';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"quote"` | A price quoted by the dealer to the customer. |
+| `"offer"` | A price offered by the customer to the dealer. |
+| `"msrp"` | Manufacturer's Suggested Retail Price. |
+| `"invoice"` | The dealer's invoice cost from the manufacturer. |
+| `"call"` | Price is not listed — contact the dealer for pricing. |
+| `"appraisal"` | An appraised value, typically for a trade-in. |
+| `"asking"` | The seller's asking price. |
+
+### PriceDelta
+
+How a price `value` should be interpreted relative to a reference price. Used together with `relativeTo` on `ADFPrice`.
+
+```typescript
+type PriceDelta = 'absolute' | 'relative' | 'percentage';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"absolute"` | The price is a flat currency amount added to (or subtracted from) the reference price. |
+| `"relative"` | The price is a relative offset in currency units. |
+| `"percentage"` | The price is a percentage of the reference price. |
+
+### PriceRelativeTo
+
+The reference price basis used when `delta` is set on an `ADFPrice`.
+
+```typescript
+type PriceRelativeTo = 'msrp' | 'invoice';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"msrp"` | Price is relative to the Manufacturer's Suggested Retail Price. |
+| `"invoice"` | Price is relative to the dealer's invoice price. |
+
+---
+
+## Finance types
+
+### FinanceMethod
+
+The method of financing for a vehicle purchase.
+
+```typescript
+type FinanceMethod = 'cash' | 'finance' | 'lease' | (string & {});
+```
+
+| Value | Description |
+|-------|-------------|
+| `"cash"` | Customer intends to pay in full with cash. |
+| `"finance"` | Customer intends to finance the purchase with a loan. |
+| `"lease"` | Customer intends to lease the vehicle. |
+| any string | The spec designates these three values but accepts free-text in practice. |
+
+### AmountType
+
+What a financing amount entry represents.
+
+```typescript
+type AmountType = 'downpayment' | 'monthly' | 'total';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"downpayment"` | An upfront payment made at signing. |
+| `"monthly"` | A recurring monthly payment amount. |
+| `"total"` | The total financed or lease amount. |
+
+### AmountLimit
+
+Whether a financing amount is a ceiling, a floor, or an exact figure.
+
+```typescript
+type AmountLimit = 'maximum' | 'minimum' | 'exact';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"maximum"` | The amount is the most the customer will pay. |
+| `"minimum"` | The amount is the least the customer will pay. |
+| `"exact"` | The amount is a precise figure. |
+
+### BalanceType
+
+What a remaining balance represents.
+
+```typescript
+type BalanceType = 'finance' | 'residual';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"finance"` | Outstanding balance on an existing auto loan. |
+| `"residual"` | Lease residual value at the end of a lease term. |
+
+---
+
+## Contact types
+
+### NamePart
+
+Which segment of a person's name an `ADFName` entry represents.
+
+```typescript
+type NamePart = 'surname' | 'first' | 'middle' | 'last' | 'full';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"surname"` | Family name (equivalent to `"last"` for some systems). |
+| `"first"` | Given name. |
+| `"middle"` | Middle name or initial. |
+| `"last"` | Family name. |
+| `"full"` | Full name as a single string when first/last are unavailable. |
+
+### NameType
+
+Whether a name belongs to a business or an individual.
+
+```typescript
+type NameType = 'business' | 'individual';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"business"` | Name of a company, dealership, or other organization. |
+| `"individual"` | Name of a person. |
+
+### PhoneType
+
+The kind of phone line associated with an `ADFPhone` entry.
+
+```typescript
+type PhoneType = 'voice' | 'fax' | 'cellphone' | 'pager';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"voice"` | Standard voice call line. |
+| `"fax"` | Fax machine line. |
+| `"cellphone"` | Mobile phone. |
+| `"pager"` | Pager device. |
+
+### PhoneTime
+
+The preferred time of day to reach the contact at this phone number.
+
+```typescript
+type PhoneTime =
+  | 'morning'
+  | 'afternoon'
+  | 'evening'
+  | 'nopreference'
+  | 'day';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"morning"` | Before noon. |
+| `"afternoon"` | Noon to early evening. |
+| `"evening"` | After business hours. |
+| `"nopreference"` | No preferred time — call any time. |
+| `"day"` | During business hours (morning or afternoon). |
+
+### AddressType
+
+The purpose of an address attached to a contact.
+
+```typescript
+type AddressType = 'work' | 'home' | 'delivery';
+```
+
+| Value | Description |
+|-------|-------------|
+| `"work"` | A business or workplace address. |
+| `"home"` | A residential address. |
+| `"delivery"` | An address to be used for deliveries. |

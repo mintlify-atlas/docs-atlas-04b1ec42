@@ -1,0 +1,126 @@
+---
+title: "ADFserialize — convert an ADFDocument to ADF XML string"
+description: "Turn any ADFDocument into a well-formed ADF 1.0 XML string. Covers round-trip editing, forwarding leads to a CRM, archiving, and output format details."
+---
+
+The `ADFserialize` function converts a typed `ADFDocument` into a complete ADF 1.0 XML string. It is the complement of `ADFparse`: any document you have parsed, modified, or constructed programmatically can be serialized back to the wire format that CRMs, dealer management systems, and lead aggregators expect. Common use cases include round-trip editing (parse, mutate a field, re-serialize), forwarding received leads to downstream systems, and archiving documents to object storage or a database as XML.
+
+## Function signature
+
+```typescript
+import { ADFserialize } from '@uhteddy/adf-kit';
+
+ADFserialize(doc: ADFDocument): string
+```
+
+## Parameters
+
+<ParamField path="doc" type="ADFDocument" required>
+  A typed `ADFDocument` — either the return value of `ADFparse`, a document
+  produced by `buildDocument`, or one built with the `ADFBuilder` fluent API.
+</ParamField>
+
+## Return value
+
+Returns a `string` containing a complete, well-formed ADF 1.0 XML document. The output:
+
+- Begins with the `<?ADF version "1.0"?>` processing instruction, followed by the standard `<?xml version="1.0"?>` XML declaration.
+- Uses two-space indentation for readability.
+- Omits optional attributes that carry their spec-default values (e.g. `interest="buy"`, `status="new"`, `type="individual"`) to keep output compact.
+- Escapes special characters (`&`, `<`, `>`, `"`) in text content and attribute values.
+
+<Note>
+  The serializer does not validate the document before writing it. Use
+  `ADFvalidate` before calling `ADFserialize` to catch spec violations early and
+  avoid forwarding non-conformant XML to a downstream system.
+</Note>
+
+## Usage
+
+### Round-trip: parse, modify, re-serialize
+
+The most common use case is reading an inbound lead, updating one or more fields, and forwarding the updated document.
+
+```typescript title="round-trip.ts"
+import { ADFparse, ADFserialize } from '@uhteddy/adf-kit';
+
+const doc = ADFparse(inboundXml);
+
+// Mark the lead as a resend before forwarding
+doc.prospects[0].status = 'resend';
+
+const updatedXml = ADFserialize(doc);
+
+await fetch('https://crm.example.com/leads', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/xml' },
+  body: updatedXml,
+});
+```
+
+### Serialize a builder-constructed document
+
+When you construct a document with the builder API and need the raw XML string rather than the `Blob` that `.xml()` returns, serialize the `ADFDocument` directly.
+
+```typescript title="serialize-builder.ts"
+import { ADFserialize, buildDocument } from '@uhteddy/adf-kit';
+
+const doc = buildDocument({
+  prospects: [
+    {
+      vehicle: { year: 2025, make: 'Honda', model: 'CR-V', interest: 'buy' },
+      customer: {
+        firstName: 'Alex',
+        lastName: 'Park',
+        email: 'alex@example.com',
+        phone: '512-555-0177',
+      },
+      vendor: { name: 'Metro Honda', email: 'internet@metrohonda.com' },
+    },
+  ],
+});
+
+const xml = ADFserialize(doc);
+console.log(xml);
+// <?ADF version "1.0"?>
+// <?xml version="1.0"?>
+// <adf>
+//   <prospect>
+//     <requestdate>…</requestdate>
+//     <vehicle>
+//       …
+//     </vehicle>
+//     …
+//   </prospect>
+// </adf>
+```
+
+<Tip>
+  Call `ADFvalidate(doc)` before `ADFserialize(doc)` to catch issues such as
+  missing required fields, invalid VINs, or out-of-range weighting values before
+  the XML is sent to a partner system.
+
+  ```typescript title="validate-then-serialize.ts"
+  import { ADFvalidate, ADFserialize } from '@uhteddy/adf-kit';
+
+  const result = ADFvalidate(doc);
+  if (!result.valid) {
+    throw new Error(`Cannot serialize invalid document: ${result.errors[0]?.message}`);
+  }
+
+  const xml = ADFserialize(doc);
+  ```
+</Tip>
+
+### Archive to storage
+
+```typescript title="archive.ts"
+import { ADFparse, ADFserialize } from '@uhteddy/adf-kit';
+import { writeFile } from 'node:fs/promises';
+
+const doc = ADFparse(inboundXml);
+const xml = ADFserialize(doc);
+
+// Archive the canonical, normalized XML representation
+await writeFile(`./archive/${doc.prospects[0].requestDate}.xml`, xml, 'utf8');
+```

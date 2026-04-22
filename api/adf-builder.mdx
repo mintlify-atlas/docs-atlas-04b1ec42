@@ -1,0 +1,269 @@
+---
+title: "ADFBuilder — multi-prospect document builder"
+description: "Complete API reference for ADFBuilder: assemble ADF documents with one or more prospects, set the spec version, and export to XML string, Blob, or typed object."
+---
+
+`ADFBuilder` is adf-kit's document-level fluent builder. While `ADFProspectBuilder` targets a single lead, `ADFBuilder` lets you compose a full ADF document containing one or more prospects in a single XML payload — useful when a customer expresses interest in multiple vehicles from different dealerships, or when you need document-level control such as setting the ADF spec version. Call `.prospect()` once per lead, then call a terminal method to produce output.
+
+## Constructor
+
+```typescript
+import { ADFBuilder } from '@uhteddy/adf-kit';
+
+const builder = new ADFBuilder();
+```
+
+`ADFBuilder` takes no arguments. Configure the document through chained method calls.
+
+---
+
+## Methods
+
+### `.version(v)`
+
+Sets the ADF spec version string embedded in the output document. Defaults to `"1.0"` — the only version defined by the ADF specification — and rarely needs to be changed.
+
+```typescript
+builder.version(v: string): ADFBuilder
+```
+
+<ParamField path="v" type="string" required>
+  ADF spec version string, e.g. `"1.0"`.
+</ParamField>
+
+---
+
+### `.prospect(input)`
+
+Adds a prospect (lead) to the document. Call this method once per prospect. Each call appends to the document — the previous prospects are preserved.
+
+```typescript
+builder.prospect(
+  input: ProspectInput | ((builder: ADFProspectBuilder) => ADFProspectBuilder<ProspectReady>)
+): ADFBuilder
+```
+
+This method accepts two forms:
+
+<ParamField path="input" type="ProspectInput | callback" required>
+  Either a `ProspectInput` plain object, or a callback function that receives a fresh `ADFProspectBuilder` and returns the configured builder.
+
+  <Expandable title="ProspectInput properties (object form)">
+    <ParamField path="vehicle" type="VehicleInput | VehicleInput[]" required>
+      One or more vehicles the customer is interested in. See [ADFProspectBuilder](/api/adf-prospect-builder) for the full `VehicleInput` field reference.
+    </ParamField>
+
+    <ParamField path="customer" type="CustomerInput" required>
+      Contact and preference details for the customer. See [ADFProspectBuilder](/api/adf-prospect-builder) for the full `CustomerInput` field reference.
+    </ParamField>
+
+    <ParamField path="vendor" type="VendorInput" required>
+      The receiving dealership or selling entity. See [ADFProspectBuilder](/api/adf-prospect-builder) for the full `VendorInput` field reference.
+    </ParamField>
+
+    <ParamField path="provider" type="ProviderInput">
+      Optional lead source information. See [ADFProspectBuilder](/api/adf-prospect-builder) for the full `ProviderInput` field reference.
+    </ParamField>
+
+    <ParamField path="requestDate" type="Date | string">
+      Lead request timestamp. Defaults to the current time when omitted.
+    </ParamField>
+
+    <ParamField path="status" type="'new' | 'resend'" default="'new'">
+      `"new"` for first-time submissions, `"resend"` when retransmitting an existing lead.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Object form
+
+Pass a `ProspectInput` object directly. This is the most concise form when you have already assembled your input data as plain objects.
+
+```typescript object form
+import { ADFBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFBuilder()
+  .prospect({
+    vehicle: { year: 2025, make: 'Toyota', model: 'Camry', interest: 'buy', status: 'new' },
+    customer: { firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com' },
+    vendor: { name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' },
+  })
+  .string();
+```
+
+#### Callback / builder form
+
+Pass a callback that receives a fresh `ADFProspectBuilder` and returns it after configuration. The callback form gives you access to the full builder API, including calling `.vehicle()` multiple times.
+
+```typescript callback form
+import { ADFBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFBuilder()
+  .prospect(p => p
+    .vehicle({ year: 2025, make: 'Toyota', model: 'Camry', interest: 'buy', status: 'new' })
+    .customer({ firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com' })
+    .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+  )
+  .string();
+```
+
+---
+
+## Terminal methods
+
+### `.build()`
+
+Returns the fully-typed `ADFDocument` object without serializing. Use this when you want to inspect or validate the document before converting it to XML.
+
+```typescript
+builder.build(): ADFDocument
+```
+
+Throws if `.prospect()` has not been called at least once.
+
+### `.string()`
+
+Serializes the document to an ADF 1.0 XML string. Suitable as an HTTP body, for storing to a file, or for any library that accepts a raw string.
+
+```typescript
+builder.string(): string
+```
+
+### `.xml()`
+
+Serializes the document to a `Blob` with `Content-Type: application/xml`. Pass it directly to `fetch` or any `BodyInit`-compatible API — the MIME type is carried by the Blob automatically.
+
+```typescript
+builder.xml(): Blob
+```
+
+---
+
+## Examples
+
+### Multiple vehicles of interest (one prospect)
+
+Use the callback form and call `.vehicle()` multiple times to express interest in several vehicles in a single prospect.
+
+```typescript multiple vehicles of interest
+import { ADFBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFBuilder()
+  .prospect(p => p
+    .vehicle({ year: 2025, make: 'Honda', model: 'CR-V', interest: 'buy', status: 'new' })
+    .vehicle({ year: 2025, make: 'Toyota', model: 'RAV4', interest: 'buy', status: 'new' })
+    .vehicle({ year: 2025, make: 'Mazda', model: 'CX-5', interest: 'buy', status: 'new' })
+    .customer({ firstName: 'Sam', email: 'sam@example.com', timeFrame: 'Next month' })
+    .vendor({ name: 'Metro Auto Group', email: 'leads@metroauto.com' })
+  )
+  .string();
+```
+
+### Multiple prospects in one document
+
+Call `.prospect()` once per lead. All prospects are serialized into a single ADF XML document.
+
+```typescript multiple prospects in one document
+import { ADFBuilder } from '@uhteddy/adf-kit';
+
+const xml = new ADFBuilder()
+  .prospect(p => p
+    .vehicle({ year: 2025, make: 'Honda', model: 'CR-V', interest: 'buy', status: 'new' })
+    .customer({ firstName: 'Sam', lastName: 'Lee', email: 'sam@example.com' })
+    .vendor({ name: 'Metro Honda', email: 'internet@metrohonda.com' })
+  )
+  .prospect(p => p
+    .vehicle({ year: 2025, make: 'Toyota', model: 'RAV4', interest: 'buy', status: 'new' })
+    .customer({ firstName: 'Sam', lastName: 'Lee', email: 'sam@example.com' })
+    .vendor({ name: 'City Toyota', email: 'leads@citytoyota.com' })
+  )
+  .string();
+```
+
+### Sending via fetch with `.xml()`
+
+The `Blob` returned by `.xml()` carries `Content-Type: application/xml`, so you do not need to set the header manually.
+
+```typescript send via fetch
+import { ADFBuilder } from '@uhteddy/adf-kit';
+
+const blob = new ADFBuilder()
+  .prospect(p => p
+    .vehicle({ year: 2025, make: 'Honda', model: 'CR-V', interest: 'buy', status: 'new' })
+    .customer({ firstName: 'Sam', email: 'sam@example.com' })
+    .vendor({ name: 'Metro Honda', email: 'internet@metrohonda.com' })
+  )
+  .xml();
+
+await fetch('https://crm.example.com/leads/adf', {
+  method: 'POST',
+  body: blob,
+});
+```
+
+---
+
+## ADFBuilder vs ADFProspectBuilder
+
+<Note>
+  Choose the builder that matches the scope of what you are generating:
+
+  - **`ADFProspectBuilder`** — use when you are generating a single lead. It is simpler, and its type-safety tracking operates at the prospect level.
+  - **`ADFBuilder`** — use when you need to bundle multiple leads into one document, set the ADF spec version, or when your architecture builds leads in a loop and adds them to a shared document.
+
+  Both builders produce identical ADF XML for a single-prospect case.
+</Note>
+
+## Output method comparison
+
+<Tabs>
+  <Tab title=".string()">
+    Returns the ADF XML as a plain string. Use with any HTTP client or library that accepts a string body.
+
+    ```typescript
+    const xml: string = new ADFBuilder()
+      .prospect(p => p
+        .vehicle({ year: 2025, make: 'Honda', model: 'CR-V' })
+        .customer({ firstName: 'Sam', email: 'sam@example.com' })
+        .vendor({ name: 'Metro Honda', email: 'internet@metrohonda.com' })
+      )
+      .string();
+    ```
+  </Tab>
+  <Tab title=".xml()">
+    Returns the ADF XML as a `Blob` with `Content-Type: application/xml`. Pass directly to `fetch` — no `Content-Type` header needed.
+
+    ```typescript
+    const blob: Blob = new ADFBuilder()
+      .prospect(p => p
+        .vehicle({ year: 2025, make: 'Honda', model: 'CR-V' })
+        .customer({ firstName: 'Sam', email: 'sam@example.com' })
+        .vendor({ name: 'Metro Honda', email: 'internet@metrohonda.com' })
+      )
+      .xml();
+
+    await fetch(dealerEndpoint, { method: 'POST', body: blob });
+    ```
+  </Tab>
+  <Tab title=".build()">
+    Returns the fully-typed `ADFDocument` object. Use when you want to inspect or validate the document before serializing.
+
+    ```typescript
+    import { ADFBuilder, ADFvalidate } from '@uhteddy/adf-kit';
+    import type { ADFDocument } from '@uhteddy/adf-kit';
+
+    const doc: ADFDocument = new ADFBuilder()
+      .prospect(p => p
+        .vehicle({ year: 2025, make: 'Honda', model: 'CR-V' })
+        .customer({ firstName: 'Sam', email: 'sam@example.com' })
+        .vendor({ name: 'Metro Honda', email: 'internet@metrohonda.com' })
+      )
+      .build();
+
+    const result = ADFvalidate(doc);
+    if (!result.valid) {
+      console.error(result.errors);
+    }
+    ```
+  </Tab>
+</Tabs>

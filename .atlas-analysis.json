@@ -1,0 +1,108 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "adf-kit",
+  "projectDescription": "A TypeScript library for parsing, validating, generating, and serializing Auto-lead Data Format (ADF) 1.0 XML documents used in automotive CRMs and lead aggregators.",
+  "theme": "luma",
+  "primaryColor": "#ee8429",
+  "lightColor": "#ebb985",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/generating-leads",
+              "guides/parsing-leads",
+              "guides/validation",
+              "guides/round-trip"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/adf-overview",
+              "concepts/prospect-anatomy",
+              "concepts/vehicle-fields",
+              "concepts/finance-and-pricing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Functions",
+            "pages": [
+              "api/parse",
+              "api/validate",
+              "api/serialize",
+              "api/generate"
+            ]
+          },
+          {
+            "group": "Builders",
+            "pages": [
+              "api/adf-prospect-builder",
+              "api/adf-builder"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types-document",
+              "api/types-vehicle",
+              "api/types-contact",
+              "api/types-enums"
+            ]
+          },
+          {
+            "group": "Errors",
+            "pages": [
+              "api/errors"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Parse ADF 1.0 XML into fully-typed TypeScript objects",
+    "Validate documents against the ADF 1.0 spec with errors and warnings",
+    "Fluent builder API (ADFProspectBuilder, ADFBuilder) for constructing leads without reading the spec",
+    "Serialize typed ADFDocument objects back to ADF-compliant XML",
+    "One-shot factory functions (generateProspect, generateADF) for simple use cases",
+    "Zero runtime dependencies in the distributed bundle",
+    "Full TypeScript types for all ADF entities, enums, and input shapes"
+  ],
+  "publicApiSurface": [
+    "ADFparse(xmlString: string): ADFDocument",
+    "ADFvalidate(doc: ADFDocument): ValidationResult",
+    "ADFserialize(doc: ADFDocument): string",
+    "ADFProspectBuilder — fluent builder for a single lead",
+    "ADFBuilder — fluent builder for a multi-prospect document",
+    "generateProspect(input: ProspectInput): string",
+    "generateADF(input: ADFInput): string",
+    "buildProspect(input: ProspectInput): ADFProspect",
+    "buildDocument(input: ADFInput): ADFDocument",
+    "ADFParseError",
+    "ADFValidationError",
+    "ADFDocument, ADFProspect, ADFVehicle, ADFCustomer, ADFVendor, ADFProvider",
+    "ADFContact, ADFId, ADFName, ADFEmail, ADFPhone, ADFAddress",
+    "ADFPrice, ADFOdometer, ADFFinance, ADFAmount, ADFBalance, ADFOption",
+    "ADFTimeFrame, ADFColorCombination",
+    "ProspectInput, VehicleInput, CustomerInput, VendorInput, ProviderInput",
+    "ValidationIssue, ValidationResult, IssueSeverity"
+  ]
+}

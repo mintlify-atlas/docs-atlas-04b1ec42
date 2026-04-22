@@ -1,0 +1,322 @@
+---
+title: "ADFVehicle type reference"
+description: "Complete reference for ADFVehicle and its sub-types — odometer, color, price, options, and financing — as defined in adf-kit's types module."
+---
+
+The `ADFVehicle` interface is the core of every ADF lead in adf-kit: it captures what the customer wants to buy, sell, lease, or test-drive, together with detailed attributes like pricing, colors, options, and financing preferences. This page documents `ADFVehicle` and every nested type it uses.
+
+---
+
+## ADFVehicle
+
+Describes a single vehicle associated with a prospect. Every `ADFProspect` must include at least one `ADFVehicle`.
+
+<ResponseField name="ids" type="ADFId[]" required>
+  System identifiers for this vehicle record. See [ADFId](/api/types-document#adfid).
+</ResponseField>
+
+<ResponseField name="year" type="number" required>
+  Model year of the vehicle, e.g. `2024`.
+</ResponseField>
+
+<ResponseField name="make" type="string" required>
+  Manufacturer name, e.g. `"Toyota"`.
+</ResponseField>
+
+<ResponseField name="model" type="string" required>
+  Model name, e.g. `"Camry"`.
+</ResponseField>
+
+<ResponseField name="vin" type="string">
+  Vehicle Identification Number.
+</ResponseField>
+
+<ResponseField name="stock" type="string">
+  Dealer stock number.
+</ResponseField>
+
+<ResponseField name="trim" type="string">
+  Trim level, e.g. `"XLE"` or `"Sport"`.
+</ResponseField>
+
+<ResponseField name="doors" type="number">
+  Number of doors on the vehicle.
+</ResponseField>
+
+<ResponseField name="bodyStyle" type="string">
+  Generic body style descriptor, e.g. `"SUV"`, `"Sedan"`, `"Coupe"`.
+</ResponseField>
+
+<ResponseField name="transmission" type="string">
+  Transmission type. Common values are `"A"` (automatic) and `"M"` (manual), but any string is accepted.
+</ResponseField>
+
+<ResponseField name="odometer" type="ADFOdometer">
+  Odometer reading for used vehicles.
+
+  <Expandable title="properties">
+    See [ADFOdometer](#adfodometer) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="condition" type="VehicleCondition">
+  Physical condition of the vehicle. One of `"excellent"`, `"good"`, `"fair"`, `"poor"`, or `"unknown"`. See [VehicleCondition](/api/types-enums#vehiclecondition).
+</ResponseField>
+
+<ResponseField name="colorCombinations" type="ADFColorCombination[]" required>
+  Ordered list of the customer's color preferences. First entry is the most preferred.
+
+  <Expandable title="properties">
+    See [ADFColorCombination](#adfcolorcombination) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="imageTag" type="ADFImageTag">
+  An image associated with the vehicle listing.
+
+  <Expandable title="properties">
+    See [ADFImageTag](#adfimagetag) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="price" type="ADFPrice">
+  The asking or quoted price for this vehicle.
+
+  <Expandable title="properties">
+    See [ADFPrice](#adfprice) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="priceComments" type="string">
+  Free-text comments about the price, e.g. notes on negotiability.
+</ResponseField>
+
+<ResponseField name="options" type="ADFOption[]" required>
+  List of vehicle options or packages the customer wants or does not want.
+
+  <Expandable title="properties">
+    See [ADFOption](#adfoption) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="finance" type="ADFFinance">
+  Financing details associated with this vehicle.
+
+  <Expandable title="properties">
+    See [ADFFinance](#adffinance) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="comments" type="string">
+  General free-text comments about the vehicle.
+</ResponseField>
+
+<ResponseField name="interest" type="VehicleInterest" required>
+  What the customer intends to do with this vehicle. One of `"buy"`, `"lease"`, `"sell"`, `"trade-in"`, or `"test-drive"`. See [VehicleInterest](/api/types-enums#vehicleinterest).
+</ResponseField>
+
+<ResponseField name="status" type="VehicleStatus" required>
+  Whether the vehicle is `"new"` or `"used"`. See [VehicleStatus](/api/types-enums#vehiclestatus).
+</ResponseField>
+
+---
+
+## ADFOdometer
+
+Records the odometer reading of a vehicle, typically used for used-car leads.
+
+<ResponseField name="value" type="number" required>
+  Numeric odometer reading.
+</ResponseField>
+
+<ResponseField name="status" type="OdometerStatus">
+  Reliability of the reading. One of `"unknown"`, `"rolledover"`, `"replaced"`, or `"original"`. See [OdometerStatus](/api/types-enums#odometerstatus).
+</ResponseField>
+
+<ResponseField name="units" type="OdometerUnits">
+  Unit of measurement: `"km"` or `"mi"`. See [OdometerUnits](/api/types-enums#odometerunits).
+</ResponseField>
+
+---
+
+## ADFColorCombination
+
+Represents one interior/exterior color pairing. Multiple entries express ordered color preferences.
+
+<ResponseField name="interiorColor" type="string">
+  Preferred interior color description, e.g. `"Black"`.
+</ResponseField>
+
+<ResponseField name="exteriorColor" type="string">
+  Preferred exterior color description, e.g. `"Midnight Blue"`.
+</ResponseField>
+
+<ResponseField name="preference" type="number">
+  Preference rank, where `1` is the most preferred and higher numbers are progressively less preferred. Assign sequential integers when providing multiple combinations.
+</ResponseField>
+
+---
+
+## ADFImageTag
+
+An image associated with the vehicle listing.
+
+<ResponseField name="url" type="string" required>
+  Fully-qualified URL of the image.
+</ResponseField>
+
+<ResponseField name="width" type="string">
+  Image display width (string, e.g. `"640"` or `"640px"`).
+</ResponseField>
+
+<ResponseField name="height" type="string">
+  Image display height (string, e.g. `"480"` or `"480px"`).
+</ResponseField>
+
+<ResponseField name="altText" type="string">
+  Descriptive alt text for the image.
+</ResponseField>
+
+---
+
+## ADFPrice
+
+A price value with optional metadata about its type, currency, and relationship to a reference price.
+
+```typescript title="price delta example"
+// "2% above invoice price"
+const price: ADFPrice = {
+  value: 2,
+  type: "quote",
+  delta: "percentage",
+  relativeTo: "invoice",
+};
+```
+
+<ResponseField name="value" type="number" required>
+  Numeric price value. When `delta` is `"percentage"`, this is a percentage; otherwise it is a monetary amount.
+</ResponseField>
+
+<ResponseField name="type" type="PriceType" required>
+  Classification of this price. See [PriceType](/api/types-enums#pricetype).
+</ResponseField>
+
+<ResponseField name="currency" type="CurrencyCode">
+  ISO 4217 currency code, e.g. `"USD"` or `"CAD"`.
+</ResponseField>
+
+<ResponseField name="delta" type="PriceDelta">
+  How `value` should be interpreted: `"absolute"` (a flat currency amount), `"relative"` (an offset), or `"percentage"`. Used together with `relativeTo`. See [PriceDelta](/api/types-enums#pricedelta).
+</ResponseField>
+
+<ResponseField name="relativeTo" type="PriceRelativeTo">
+  The reference price that `delta` is applied against: `"msrp"` or `"invoice"`. See [PriceRelativeTo](/api/types-enums#pricerelativeto).
+</ResponseField>
+
+<ResponseField name="source" type="string">
+  Name of the source that provided this price, e.g. `"Kelley Blue Book"`.
+</ResponseField>
+
+<Note>
+  `currency` follows ISO 4217. Pass a three-letter code such as `"USD"`, `"EUR"`, or `"CAD"`. The type is imported from the `currency-codes-ts` package and will reject invalid codes at compile time.
+</Note>
+
+---
+
+## ADFOption
+
+A single vehicle option, package, or feature that the customer wants (or explicitly does not want).
+
+<ResponseField name="optionName" type="string" required>
+  Human-readable name of the option or package, e.g. `"Sunroof"` or `"Technology Package"`.
+</ResponseField>
+
+<ResponseField name="manufacturerCode" type="string">
+  Manufacturer's option code, e.g. `"PP"` for a premium paint upgrade.
+</ResponseField>
+
+<ResponseField name="stock" type="string">
+  Stock number associated with this option.
+</ResponseField>
+
+<ResponseField name="weighting" type="number">
+  Importance of this option to the customer, on a scale from `-100` to `+100`. A value of `+100` means the customer considers the option essential; `-100` means the customer actively does not want it; `0` means no preference.
+</ResponseField>
+
+<ResponseField name="price" type="ADFPrice">
+  Price associated with this option.
+
+  <Expandable title="properties">
+    See [ADFPrice](#adfprice) above.
+  </Expandable>
+</ResponseField>
+
+<Note>
+  The `weighting` range is `-100` to `+100`. Use positive values for desired options and negative values for options the customer wants to exclude. A value of `0` or omitting the field entirely signals no preference.
+</Note>
+
+---
+
+## ADFFinance
+
+Financing details the customer is considering for a vehicle.
+
+<ResponseField name="method" type="FinanceMethod" required>
+  The financing method. Commonly `"cash"`, `"finance"`, or `"lease"`, but accepts any string value. See [FinanceMethod](/api/types-enums#financemethod).
+</ResponseField>
+
+<ResponseField name="amounts" type="ADFAmount[]" required>
+  One or more payment amounts associated with this financing arrangement.
+
+  <Expandable title="properties">
+    See [ADFAmount](#adfamount) below.
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="balance" type="ADFBalance">
+  Remaining balance on a trade-in or lease.
+
+  <Expandable title="properties">
+    See [ADFBalance](#adfbalance) below.
+  </Expandable>
+</ResponseField>
+
+---
+
+## ADFAmount
+
+A single financing payment amount — for example a down payment, monthly payment, or total.
+
+<ResponseField name="value" type="number" required>
+  Numeric amount value.
+</ResponseField>
+
+<ResponseField name="type" type="AmountType" required>
+  What this amount represents: `"downpayment"`, `"monthly"`, or `"total"`. See [AmountType](/api/types-enums#amounttype).
+</ResponseField>
+
+<ResponseField name="limit" type="AmountLimit" required>
+  Whether this amount is a `"maximum"`, `"minimum"`, or `"exact"` figure. See [AmountLimit](/api/types-enums#amountlimit).
+</ResponseField>
+
+<ResponseField name="currency" type="CurrencyCode">
+  ISO 4217 currency code for this amount.
+</ResponseField>
+
+---
+
+## ADFBalance
+
+The remaining balance on an existing vehicle (e.g. a lease residual or trade-in payoff amount).
+
+<ResponseField name="value" type="number" required>
+  Numeric balance amount.
+</ResponseField>
+
+<ResponseField name="type" type="BalanceType" required>
+  What the balance represents: `"finance"` (outstanding finance balance) or `"residual"` (lease residual value). See [BalanceType](/api/types-enums#balancetype).
+</ResponseField>
+
+<ResponseField name="currency" type="CurrencyCode">
+  ISO 4217 currency code for this balance amount.
+</ResponseField>

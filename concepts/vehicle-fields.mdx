@@ -1,0 +1,255 @@
+---
+title: "ADFVehicle fields: a complete reference"
+description: "Complete reference for every field on ADFVehicle in adf-kit: year, make, model, VIN, condition, odometer, pricing, options, colors, and finance."
+---
+
+Every ADF prospect contains at least one vehicle — the car, truck, or SUV the buyer is interested in buying, leasing, trading in, or test-driving. In adf-kit, the `ADFVehicle` interface maps directly to the `<vehicle>` element in the ADF 1.0 XML spec and carries all the information a dealer needs to understand what the prospect wants. This page documents every field on `ADFVehicle`, the allowed values for enumeration types, and how to set them using `VehicleInput` in the fluent builder API.
+
+<Note>
+  `year`, `make`, `model`, `interest`, and `status` are required on every vehicle. `ADFvalidate` returns errors when any of them is missing or empty.
+</Note>
+
+## Identity fields
+
+<ResponseField name="ids" type="ADFId[]" required>
+  Tracking identifiers for this vehicle record across systems. Each entry has a `value` (string), an optional `source` (system name — required by spec), and an optional `sequence` (ordinal). `ADFvalidate` errors when `source` is absent.
+</ResponseField>
+
+<ResponseField name="year" type="number" required>
+  The model year of the vehicle, e.g. `2025`. `ADFvalidate` warns when the value falls outside the range 1886–2100.
+</ResponseField>
+
+<ResponseField name="make" type="string" required>
+  The manufacturer name, e.g. `"Toyota"`, `"Ford"`, `"BMW"`.
+</ResponseField>
+
+<ResponseField name="model" type="string" required>
+  The model name, e.g. `"Camry"`, `"F-150"`, `"3 Series"`.
+</ResponseField>
+
+<ResponseField name="vin" type="string">
+  The 17-character Vehicle Identification Number. `ADFvalidate` warns when the VIN does not match the standard format (17 alphanumeric characters, excluding the letters I, O, and Q).
+</ResponseField>
+
+<ResponseField name="stock" type="string">
+  The dealer's internal stock number for this unit, e.g. `"P22481"`.
+</ResponseField>
+
+<ResponseField name="trim" type="string">
+  The trim level, e.g. `"XSE"`, `"XLT"`, `"330i"`.
+</ResponseField>
+
+<ResponseField name="doors" type="number">
+  Number of doors on the vehicle.
+</ResponseField>
+
+<ResponseField name="bodyStyle" type="string">
+  Generic body style description, e.g. `"SUV"`, `"Sedan"`, `"Coupe"`, `"Pickup"`.
+</ResponseField>
+
+<ResponseField name="transmission" type="string">
+  Transmission type. The ADF spec conventionally uses `"A"` for automatic and `"M"` for manual, though the field is free-text.
+</ResponseField>
+
+---
+
+## Status and interest
+
+<ResponseField name="interest" type="VehicleInterest" required>
+  What the customer wants to do with this vehicle. One of the values in the table below.
+</ResponseField>
+
+<ResponseField name="status" type="'new' | 'used'" required>
+  Whether the vehicle is new inventory or a used/pre-owned unit.
+</ResponseField>
+
+<ResponseField name="condition" type="'excellent' | 'good' | 'fair' | 'poor' | 'unknown'">
+  Condition rating, typically used for used vehicles and trade-ins.
+</ResponseField>
+
+### Interest values
+
+| Value | Typical use case |
+|---|---|
+| `'buy'` | Customer wants to purchase the vehicle outright |
+| `'lease'` | Customer wants to lease the vehicle |
+| `'sell'` | Dealer is selling; less commonly used on inbound leads |
+| `'trade-in'` | Customer wants a trade-in appraisal for this vehicle |
+| `'test-drive'` | Customer wants to schedule a test drive |
+
+---
+
+## Odometer
+
+<ResponseField name="odometer" type="ADFOdometer">
+  Mileage reading, primarily used for used vehicles and trade-ins.
+
+  <Expandable title="ADFOdometer properties">
+    <ResponseField name="value" type="number" required>
+      The numeric odometer reading. `ADFvalidate` warns on negative values.
+    </ResponseField>
+    <ResponseField name="units" type="'mi' | 'km'">
+      Unit of measurement. Defaults to `'mi'` in most North American contexts.
+    </ResponseField>
+    <ResponseField name="status" type="'unknown' | 'rolledover' | 'replaced' | 'original'">
+      The provenance of the odometer reading.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Colors and images
+
+<ResponseField name="colorCombinations" type="ADFColorCombination[]" required>
+  Ordered list of acceptable color combinations, ranked by preference. An empty array is valid.
+
+  <Expandable title="ADFColorCombination properties">
+    <ResponseField name="exteriorColor" type="string">
+      Exterior paint color name or code.
+    </ResponseField>
+    <ResponseField name="interiorColor" type="string">
+      Interior trim/upholstery color. `ADFvalidate` warns when a combination has neither color set.
+    </ResponseField>
+    <ResponseField name="preference" type="number">
+      Preference rank: `1` = most preferred, higher numbers = less preferred. Must be a positive integer. `ADFvalidate` warns on non-positive or non-integer values. When using `ColorInput`, preference is auto-assigned in array order when omitted.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="imageTag" type="ADFImageTag">
+  An image associated with the vehicle.
+
+  <Expandable title="ADFImageTag properties">
+    <ResponseField name="url" type="string" required>
+      URL of the image.
+    </ResponseField>
+    <ResponseField name="width" type="string">
+      Image width (pixels as string).
+    </ResponseField>
+    <ResponseField name="height" type="string">
+      Image height (pixels as string).
+    </ResponseField>
+    <ResponseField name="altText" type="string">
+      Descriptive alt text for the image.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Pricing
+
+<ResponseField name="price" type="ADFPrice">
+  The vehicle's price. See the [finance and pricing reference](/concepts/finance-and-pricing) for a full breakdown of `ADFPrice` and the `PriceType` enum. When using `VehicleInput`, you can pass a plain number (interpreted as a `quote` price) or a `PriceInput` object.
+</ResponseField>
+
+<ResponseField name="priceComments" type="string">
+  Free-text commentary on the price, e.g. `"Price includes dealer discount"`.
+</ResponseField>
+
+---
+
+## Options
+
+<ResponseField name="options" type="ADFOption[]" required>
+  Accessories, packages, or features the customer wants or doesn't want. An empty array is valid.
+
+  <Expandable title="ADFOption properties">
+    <ResponseField name="optionName" type="string" required>
+      The name of the option or package, e.g. `"Sunroof"`, `"Tow Package"`.
+    </ResponseField>
+    <ResponseField name="manufacturerCode" type="string">
+      OEM or manufacturer option code.
+    </ResponseField>
+    <ResponseField name="stock" type="string">
+      Dealer stock number for this option.
+    </ResponseField>
+    <ResponseField name="weighting" type="number">
+      Customer preference weight: `+100` = essential to have, `-100` = essential NOT to have, `0` = neutral. Must be between −100 and +100; `ADFvalidate` errors on values outside this range.
+    </ResponseField>
+    <ResponseField name="price" type="ADFPrice">
+      Price of this option, using the same `ADFPrice` shape as the vehicle price.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Finance
+
+<ResponseField name="finance" type="ADFFinance">
+  Financing preferences tied to this specific vehicle. See the [finance and pricing reference](/concepts/finance-and-pricing) for a complete breakdown.
+</ResponseField>
+
+---
+
+## Comments
+
+<ResponseField name="comments" type="string">
+  Free-text notes about this vehicle from the customer, e.g. color preferences, optional features requested, or conditions of sale.
+</ResponseField>
+
+---
+
+## VehicleInput — simplified input type
+
+When using `ADFProspectBuilder` or `generateProspect`, you pass a `VehicleInput` object rather than a raw `ADFVehicle`. The generator converts it internally. Key differences from `ADFVehicle`:
+
+- `price` accepts `number | PriceInput` (a plain number becomes `{ value: n, type: 'quote' }`)
+- `mileage` accepts `number | OdometerInput` (a plain number becomes `{ value: n }`)
+- `colors` accepts `ColorInput | ColorInput[]` with `interior`/`exterior` shorthand properties
+- `options` accepts `string | OptionInput | Array<string | OptionInput>` (plain strings become `{ optionName: s }`)
+- `interest` defaults to `'buy'` when omitted
+- `status` defaults to `'new'` when omitted
+
+```typescript
+import { ADFProspectBuilder } from '@uhteddy/adf-kit';
+
+// New car purchase with colors and options
+const xml = new ADFProspectBuilder()
+  .vehicle({
+    year: 2025,
+    make: 'Toyota',
+    model: 'Camry',
+    trim: 'XSE',
+    interest: 'buy',
+    status: 'new',
+    price: 32_500,
+    colors: [
+      { exterior: 'Midnight Black', interior: 'Black', preference: 1 },
+      { exterior: 'Celestial Silver', interior: 'Gray', preference: 2 },
+    ],
+    options: [
+      { name: 'Sunroof', weighting: 80 },
+      { name: 'Heated Seats', weighting: 50 },
+    ],
+  })
+  .customer({ firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com' })
+  .vendor({ name: 'Sunrise Toyota', email: 'leads@sunrisetoyota.com' })
+  .string();
+```
+
+```typescript
+// Used vehicle trade-in with mileage
+const xml = new ADFProspectBuilder()
+  .vehicle({
+    year: 2019,
+    make: 'Honda',
+    model: 'CR-V',
+    trim: 'EX',
+    vin: '2HKRW2H55KH600001',
+    interest: 'trade-in',
+    status: 'used',
+    mileage: { value: 78_400, units: 'mi', status: 'original' },
+    condition: 'good',
+    price: { value: 22_000, type: 'appraisal' },
+  })
+  .customer({ firstName: 'Marcus', lastName: 'Johnson', email: 'marcus.j@example.com' })
+  .vendor({ name: 'Greenfield Honda', email: 'appraisals@greenfieldhonda.com' })
+  .string();
+```
+
+<Note>
+  VIN validation checks for exactly 17 characters using only alphanumeric characters and excluding the letters **I**, **O**, and **Q**, which are omitted from the VIN standard to avoid confusion with 1, 0, and Q visually. `ADFvalidate` emits a warning (not an error) for malformed VINs; the document is still considered valid if all required fields are present.
+</Note>
